@@ -2,7 +2,7 @@
   {
     "asset_id": "web-server",
     "name": "Web Server",
-    "image": "nginx:1.24-alpine",
+    "image": "nginx:1.18.0",
     "type": "web application",
     "importance": 80,
     "criticality": "High",
@@ -12,7 +12,7 @@
   {
     "asset_id": "db-server",
     "name": "Database Server",
-    "image": "postgres:12-old",
+    "image": "postgres:11.0",
     "type": "database",
     "importance": 100,
     "criticality": "Critical",
@@ -22,7 +22,7 @@
   {
     "asset_id": "test-server",
     "name": "Test Server",
-    "image": "python:3.9-slim",
+    "image": "python:3.7-slim",
     "type": "development",
     "importance": 20,
     "criticality": "Low",

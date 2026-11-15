@@ -45,7 +45,7 @@ cd dashboard && pip3 install -r requirements.txt && streamlit run app.py
 
 # 3. A manual scan test
 docker run --rm -v $(pwd)/scanner/reports:/reports aquasec/trivy image \
-  --format json --output /reports/report.json nginx:latest
+  --format json --output /reports/report.json nginx:1.18.0
 ```
 
 ## Priority formula
