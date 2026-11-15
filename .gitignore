@@ -6,3 +6,11 @@ __pycache__/
 .venv/
 *.pyc
 .env
+.trivy-cache/
+dashboard/node_modules/
+dashboard/public/build/
+dashboard/vendor/
+dashboard/.env
+dashboard/storage/*.key
+dashboard/database/database.sqlite
+streamlit/.venv/
