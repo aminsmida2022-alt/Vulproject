@@ -1,0 +1,8 @@
+n8n/data/
+gitea/data/
+scanner/reports/*.json
+data/vulnerabilities/*.json
+__pycache__/
+.venv/
+*.pyc
+.env

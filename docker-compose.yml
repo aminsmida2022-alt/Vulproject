@@ -1,0 +1,71 @@
+name: vulnmgmt
+
+networks:
+  core:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  gitea_data:
+  gitea_db_data:
+
+services:
+  # ---------- SOAR platform ----------
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: vulnmgmt-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Europe/Paris
+      - TZ=Europe/Paris
+      - N8N_SECURE_COOKIE=false        # http only in the local lab
+      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_PAYLOAD_SIZE_MAX=64        # large Trivy JSON reports
+      - N8N_DIAGNOSTICS_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/import-workflows:ro
+      - ./data:/data:ro                # shared read access to findings
+    networks:
+      - core
+
+  # ---------- Ticket management ----------
+  gitea-db:
+    image: postgres:16-alpine
+    container_name: vulnmgmt-gitea-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=gitea
+      - POSTGRES_PASSWORD=gitea_lab_pwd
+      - POSTGRES_DB=gitea
+    volumes:
+      - gitea_db_data:/var/lib/postgresql/data
+    networks:
+      - core
+
+  gitea:
+    image: gitea/gitea:latest
+    container_name: vulnmgmt-gitea
+    restart: unless-stopped
+    depends_on:
+      - gitea-db
+    ports:
+      - "3001:3000"   # host 3000 is taken by the Next.js dev server
+      - "2222:22"
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=gitea-db:5432
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=gitea_lab_pwd
+      - GITEA__database__NAME=gitea
+      - GITEA__server__DOMAIN=localhost
+      - GITEA__server__ROOT_URL=http://localhost:3001/
+      - GITEA__server__HTTP_PORT=3000
+    volumes:
+      - gitea_data:/data
+    networks:
+      - core

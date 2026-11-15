@@ -1,0 +1,32 @@
+[
+  {
+    "asset_id": "web-server",
+    "name": "Web Server",
+    "image": "nginx:1.24-alpine",
+    "type": "web application",
+    "importance": 80,
+    "criticality": "High",
+    "exposed": true,
+    "owner": "admin"
+  },
+  {
+    "asset_id": "db-server",
+    "name": "Database Server",
+    "image": "postgres:12-old",
+    "type": "database",
+    "importance": 100,
+    "criticality": "Critical",
+    "exposed": false,
+    "owner": "dba"
+  },
+  {
+    "asset_id": "test-server",
+    "name": "Test Server",
+    "image": "python:3.9-slim",
+    "type": "development",
+    "importance": 20,
+    "criticality": "Low",
+    "exposed": false,
+    "owner": "dev"
+  }
+]
