@@ -18,6 +18,13 @@ return [
     */
     'scan_script' => 'scanner/scan_all.sh',
     'enrich_script' => 'python3 scripts/enrich.py',
+    'verify_script' => 'python3 scripts/verify.py',
+
+    /*
+    | Daily automatic scan (Laravel scheduler, needs `php artisan schedule:work`
+    | or a cron entry running `php artisan schedule:run` every minute).
+    */
+    'scheduled_scan_at' => env('VULNMGMT_SCAN_AT', '02:00'),
 
     /*
     | SOAR integration: n8n webhook that receives the enriched findings
@@ -27,7 +34,7 @@ return [
 
     'gitea' => [
         'url' => env('VULNMGMT_GITEA_URL', 'http://localhost:3001'),
-        'token' => env('VULNMGMT_GITEA_TOKEN', '***REMOVED***'),
+        'token' => env('VULNMGMT_GITEA_TOKEN', ''),
         'repo' => env('VULNMGMT_GITEA_REPO', 'vulnadmin/remediation-tickets'),
     ],
 ];

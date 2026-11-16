@@ -1,13 +1,16 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { scan } from '@/routes/vuln';
 import { cn } from '@/lib/utils';
 
 type Finding = {
   cve: string;
+  asset_id: string;
   asset_name: string;
   pkg: string;
   installed: string;
+  fixed?: string | null;
+  status?: string;
   severity: string;
   cvss: number;
   epss: number;
@@ -37,6 +40,26 @@ type Ticket = {
   url: string;
   state: string;
   created_at: string;
+  closed_at?: string | null;
+  due_date?: string | null;
+  labels: { name: string; color: string }[];
+};
+
+type VerifyStatus = {
+  state: 'idle' | 'running' | 'done' | 'failed';
+  ticket: number | null;
+  started_at?: string | null;
+  log: string[];
+};
+
+type Verification = {
+  ticket: number;
+  cve: string;
+  asset_id: string;
+  image: string;
+  result: 'fixed' | 'still-present';
+  verified_at: string;
+  evidence_file: string;
 };
 
 type AssetProgress = {
@@ -73,7 +96,92 @@ type Props = {
   history: History[];
   scanStatus: ScanStatus;
   tickets: Ticket[];
+  closedTickets: Ticket[];
+  verifyStatus: VerifyStatus;
+  verifications: Verification[];
 };
+
+const PAGE_SIZE = 15;
+const ticketKey = (cve: string, asset: string) => `${cve}|${asset}`;
+const TITLE_RE = /Fix (CVE-\d{4}-\d+) on (.+)$/;
+
+function LabelChip({ name, color }: { name: string; color: string }) {
+  return (
+    <span
+      className="mr-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+      style={{ background: color }}
+    >
+      {name}
+    </span>
+  );
+}
+
+/** Score breakdown for one finding: P = 0.25C + 0.30E + 0.25K + 0.20A */
+function FindingDetail({ f, importance, ticket, onClose }: {
+  f: Finding;
+  importance: number;
+  ticket?: Ticket;
+  onClose: () => void;
+}) {
+  const parts = [
+    { label: 'CVSS', raw: `${f.cvss?.toFixed(1)} / 10`, pts: 0.25 * Math.min(f.cvss * 10, 100), max: 25, color: '#7f1d1d' },
+    { label: 'EPSS', raw: `${((f.epss ?? 0) * 100).toFixed(2)}%`, pts: 0.3 * (f.epss ?? 0) * 100, max: 30, color: '#ea580c' },
+    { label: 'KEV', raw: f.kev ? 'listed' : 'not listed', pts: f.kev ? 25 : 0, max: 25, color: '#5319e7' },
+    { label: 'Asset', raw: `${importance} / 100`, pts: 0.2 * importance, max: 20, color: '#0284c7' },
+  ];
+
+  return (
+    <div className="rounded-lg border border-neutral-300 bg-neutral-50 p-4 text-xs dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div>
+          <div className="font-mono text-sm font-bold">{f.cve}</div>
+          <div className="mt-0.5 text-neutral-600 dark:text-neutral-300">{f.title}</div>
+        </div>
+        <button onClick={onClose} className="rounded px-2 py-1 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800">
+          ✕
+        </button>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <dl className="grid grid-cols-[110px_1fr] gap-y-1">
+          <dt className="text-neutral-500">Asset</dt><dd>{f.asset_name}</dd>
+          <dt className="text-neutral-500">Package</dt><dd className="font-mono">{f.pkg} {f.installed}</dd>
+          <dt className="text-neutral-500">Fixed in</dt><dd className="font-mono">{f.fixed || 'no fix available'}</dd>
+          <dt className="text-neutral-500">Severity</dt><dd>{f.severity}</dd>
+          <dt className="text-neutral-500">Ticket</dt>
+          <dd>
+            {ticket ? (
+              <a href={ticket.url} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+                #{ticket.number} ({ticket.state})
+              </a>
+            ) : f.priority_score >= 60 ? 'pending (next n8n run)' : 'not required (below P2)'}
+          </dd>
+          <dt className="text-neutral-500">NVD</dt>
+          <dd>
+            <a href={`https://nvd.nist.gov/vuln/detail/${f.cve}`} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">
+              nvd.nist.gov
+            </a>
+          </dd>
+        </dl>
+        <div>
+          <div className="mb-1 font-semibold">
+            Priority score {f.priority_score.toFixed(1)} = sum of weighted factors
+          </div>
+          {parts.map((p) => (
+            <div key={p.label} className="mb-1.5">
+              <div className="flex justify-between">
+                <span>{p.label} <span className="text-neutral-400">({p.raw})</span></span>
+                <span className="tabular-nums font-semibold">{p.pts.toFixed(1)} / {p.max}</span>
+              </div>
+              <div className="h-1.5 rounded bg-neutral-200 dark:bg-neutral-800">
+                <div className="h-1.5 rounded" style={{ width: `${(p.pts / p.max) * 100}%`, background: p.color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const P_COLORS: Record<string, string> = {
   'P1-CRITICAL': '#dc2626',
@@ -178,7 +286,8 @@ function Scatter({ data }: { data: Finding[] }) {
 
   return (
     <div className="px-2 py-3">
-      <svg viewBox={`0 0 ${W} ${H + 30}`} className="w-full">
+      <svg viewBox={`-24 -6 ${W + 30} ${H + 36}`} className="w-full">
+        <text x={4} y={8} className="fill-neutral-400 text-[8px]">EPSS %</text>
         {[0, 0.25, 0.5, 0.75, 1].map((g) => (
           <g key={g}>
             <line x1={0} x2={W} y1={H - g * H} y2={H - g * H} stroke="#f1f5f9" strokeWidth="1" />
@@ -192,14 +301,16 @@ function Scatter({ data }: { data: Finding[] }) {
             {t}
           </text>
         ))}
-        {data.slice(0, 120).map((f, i) => (
+        {[...data].sort((a, b) => Number(a.kev) - Number(b.kev)).map((f, i) => (
           <circle
             key={`${f.cve}-${i}`}
             cx={px(f.cvss ?? 0)}
-            cy={py((f.epss ?? 0) * 100)}
-            r={f.kev ? 5 : 3}
+            cy={py(f.epss ?? 0)}
+            r={f.kev ? 5 : 2.5}
             fill={f.kev ? '#dc2626' : '#0ea5e9'}
-            fillOpacity={f.kev ? 0.9 : 0.45}
+            fillOpacity={f.kev ? 0.9 : 0.35}
+            stroke={f.kev ? '#ffffff' : 'none'}
+            strokeWidth={f.kev ? 1.5 : 0}
           />
         ))}
         <text x={W / 2} y={H + 26} textAnchor="middle" className="fill-neutral-400 text-[9px]">
@@ -237,7 +348,72 @@ function Card({ title, subtitle, children, className }: {
 
 /* ---------- page ---------- */
 
-export default function VulnOverview({ stats, findings, inventory, history, scanStatus, tickets }: Props) {
+export default function VulnOverview({
+  stats, findings, inventory, history, scanStatus, tickets, closedTickets, verifyStatus, verifications,
+}: Props) {
+  /* ---------- findings filters + drill-down ---------- */
+  const [fPriority, setFPriority] = useState('all');
+  const [fAsset, setFAsset] = useState('all');
+  const [fKev, setFKev] = useState(false);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const filtered = findings.filter((f) =>
+    (fPriority === 'all' || f.priority === fPriority)
+    && (fAsset === 'all' || f.asset_id === fAsset)
+    && (!fKev || f.kev)
+    && (query === '' || `${f.cve} ${f.pkg} ${f.title}`.toLowerCase().includes(query.toLowerCase())));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const ticketIndex: Record<string, Ticket> = {};
+  for (const t of [...closedTickets, ...tickets]) {
+    const m = t.title.match(TITLE_RE);
+    if (m) ticketIndex[ticketKey(m[1], m[2])] = t;
+  }
+  const importanceOf = (assetId: string) => inventory.find((a) => a.asset_id === assetId)?.importance ?? 0;
+
+  /* ---------- Phase 8: verification ---------- */
+  const [vStatus, setVStatus] = useState<VerifyStatus>(verifyStatus);
+  const vPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const verifying = vStatus.state === 'running';
+
+  const pollVerify = () => {
+    if (vPollRef.current) return;
+    vPollRef.current = setInterval(async () => {
+      try {
+        const data: VerifyStatus = await (await fetch('/tickets/verify/status')).json();
+        setVStatus(data);
+        if (data.state !== 'running') {
+          if (vPollRef.current) clearInterval(vPollRef.current);
+          vPollRef.current = null;
+          router.reload({ only: ['tickets', 'closedTickets', 'verifications', 'verifyStatus', 'history'] });
+        }
+      } catch {
+        /* transient errors ignored */
+      }
+    }, 2000);
+  };
+
+  useEffect(() => {
+    if (verifyStatus.state === 'running') pollVerify();
+    return () => {
+      if (vPollRef.current) clearInterval(vPollRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const runVerify = (ticket: number | null) => {
+    router.post('/tickets/verify', ticket === null ? {} : { ticket }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setVStatus({ state: 'running', ticket, log: [] });
+        pollVerify();
+      },
+    });
+  };
+
   const scanForm = useForm({});
   const [status, setStatus] = useState<ScanStatus>(scanStatus);
   const [polling, setPolling] = useState(false);
@@ -267,7 +443,7 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
         setStatus(data);
         if (data.state === 'done' || data.state === 'failed') {
           stopPolling();
-          router.reload({ only: ['stats', 'findings', 'inventory', 'history', 'tickets'] });
+          router.reload({ only: ['stats', 'findings', 'inventory', 'history', 'tickets', 'closedTickets'] });
         }
       } catch {
         /* transient errors ignored */
@@ -276,7 +452,7 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
   };
 
   const runScan = () => {
-    scanForm.post(scan(), {
+    scanForm.post(scan().url, {
       preserveScroll: true,
       onSuccess: () => {
         scanForm.reset();
@@ -302,7 +478,6 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
   }));
 
   const maxPriority = Math.max(stats.p1, stats.p2, stats.p3, stats.p4, stats.p5, 1);
-  const top = findings.slice(0, 8);
 
   return (
     <>
@@ -335,9 +510,9 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
           </button>
         </div>
 
-        {scanForm.errors.scan && (
+        {(scanForm.errors as Record<string, string>).scan && (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {scanForm.errors.scan}
+            {(scanForm.errors as Record<string, string>).scan}
           </div>
         )}
 
@@ -413,8 +588,29 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
           </Card>
         </div>
 
-        {/* top findings */}
-        <Card title="Top findings by contextual priority" subtitle="Ranked by the weighted score — not CVSS alone">
+        {/* findings explorer with drill-down */}
+        <Card title="Findings by contextual priority" subtitle="Ranked by the weighted score, not CVSS alone. Click a row for the score breakdown.">
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+            <input
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPage(0); }}
+              placeholder="Search CVE, package, title…"
+              className="w-56 rounded border bg-white px-2 py-1 dark:bg-neutral-900"
+            />
+            <select value={fPriority} onChange={(e) => { setFPriority(e.target.value); setPage(0); }} className="rounded border bg-white px-2 py-1 dark:bg-neutral-900">
+              <option value="all">All priorities</option>
+              {Object.keys(P_COLORS).map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={fAsset} onChange={(e) => { setFAsset(e.target.value); setPage(0); }} className="rounded border bg-white px-2 py-1 dark:bg-neutral-900">
+              <option value="all">All assets</option>
+              {inventory.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.name}</option>)}
+            </select>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={fKev} onChange={(e) => { setFKev(e.target.checked); setPage(0); }} />
+              KEV only
+            </label>
+            <span className="ml-auto text-neutral-400">{filtered.length} of {findings.length} findings</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -426,76 +622,172 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
                   <th className="py-2 pr-3 font-medium">Package</th>
                   <th className="py-2 pr-3 text-right font-medium">CVSS</th>
                   <th className="py-2 pr-3 text-right font-medium">EPSS</th>
-                  <th className="py-2 font-medium">KEV</th>
+                  <th className="py-2 pr-3 font-medium">KEV</th>
+                  <th className="py-2 font-medium">Ticket</th>
                 </tr>
               </thead>
               <tbody>
-                {top.length === 0 && (
+                {pageRows.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-neutral-400">
-                      No findings yet — click <strong>Start Scan</strong> to run the first scan.
+                    <td colSpan={9} className="py-10 text-center text-neutral-400">
+                      {findings.length === 0
+                        ? <>No findings yet. Click <strong>Start Scan</strong> to run the first scan.</>
+                        : 'No finding matches the filters.'}
                     </td>
                   </tr>
                 )}
-                {top.map((f, i) => (
-                  <tr key={`${f.cve}-${i}`} className="border-b last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                    <td className="py-2 pr-3 font-bold tabular-nums" style={{ color: P_COLORS[f.priority] ?? '#94a3b8' }}>
-                      {f.priority_score.toFixed(1)}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <span
-                        className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                        style={{ background: P_COLORS[f.priority] ?? '#94a3b8' }}
+                {pageRows.map((f) => {
+                  const key = `${f.cve}|${f.asset_id}|${f.pkg}`;
+                  const ticket = ticketIndex[ticketKey(f.cve, f.asset_name)];
+                  return (
+                    <Fragment key={key}>
+                      <tr
+                        onClick={() => setSelected(selected === key ? null : key)}
+                        className={cn(
+                          'cursor-pointer border-b last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-900',
+                          selected === key && 'bg-neutral-100 dark:bg-neutral-800',
+                        )}
                       >
-                        {f.priority}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-3 font-mono">{f.cve}</td>
-                    <td className="py-2 pr-3">{f.asset_name}</td>
-                    <td className="py-2 pr-3 text-neutral-500">
-                      {f.pkg} ({f.installed})
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{f.cvss?.toFixed(1) ?? '—'}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {f.epss ? `${(f.epss * 100).toFixed(1)}%` : '—'}
-                    </td>
-                    <td className="py-2">
-                      {f.kev ? (
-                        <span className="font-semibold text-red-600">●</span>
-                      ) : (
-                        <span className="text-neutral-300">—</span>
+                        <td className="py-2 pr-3 font-bold tabular-nums" style={{ color: P_COLORS[f.priority] ?? '#94a3b8' }}>
+                          {f.priority_score.toFixed(1)}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-white" style={{ background: P_COLORS[f.priority] ?? '#94a3b8' }}>
+                            {f.priority}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-3 font-mono">{f.cve}</td>
+                        <td className="py-2 pr-3">{f.asset_name}</td>
+                        <td className="py-2 pr-3 text-neutral-500">{f.pkg} ({f.installed})</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{f.cvss?.toFixed(1) ?? '—'}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">{f.epss ? `${(f.epss * 100).toFixed(1)}%` : '—'}</td>
+                        <td className="py-2 pr-3">
+                          {f.kev ? <span className="font-semibold text-red-600">●</span> : <span className="text-neutral-300">—</span>}
+                        </td>
+                        <td className="py-2 font-mono text-neutral-500">
+                          {ticket ? `#${ticket.number}${ticket.state === 'closed' ? ' ✓' : ''}` : '—'}
+                        </td>
+                      </tr>
+                      {selected === key && (
+                        <tr>
+                          <td colSpan={9} className="py-2">
+                            <FindingDetail f={f} importance={importanceOf(f.asset_id)} ticket={ticket} onClose={() => setSelected(null)} />
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          {findings.length > top.length && (
-            <p className="mt-2 text-right text-xs text-neutral-400">
-              showing 8 of {findings.length} findings
-            </p>
+          {pageCount > 1 && (
+            <div className="mt-2 flex items-center justify-end gap-2 text-xs">
+              <button disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded border px-2 py-0.5 disabled:opacity-40">←</button>
+              <span className="tabular-nums text-neutral-500">page {page + 1} / {pageCount}</span>
+              <button disabled={page >= pageCount - 1} onClick={() => setPage(page + 1)} className="rounded border px-2 py-0.5 disabled:opacity-40">→</button>
+            </div>
+          )}
+        </Card>
+
+        {/* remediation tickets + verification (Phase 8) */}
+        <Card
+          title="Remediation tickets"
+          subtitle="Created by n8n · closed only when a rescan proves the finding is gone"
+        >
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-neutral-500">{tickets.length} open · {closedTickets.length} recently closed</span>
+            <button
+              onClick={() => runVerify(null)}
+              disabled={verifying || tickets.length === 0}
+              className="ml-auto rounded-md bg-neutral-900 px-3 py-1.5 font-semibold text-white disabled:cursor-not-allowed disabled:bg-neutral-400 dark:bg-white dark:text-neutral-900"
+            >
+              {verifying ? 'Verifying…' : 'Verify all open tickets'}
+            </button>
+          </div>
+          {vStatus.state !== 'idle' && (
+            <div className="mb-3 rounded border bg-white p-2 text-xs dark:bg-neutral-950">
+              <div className="mb-1 flex items-center gap-2 font-semibold">
+                {verifying && <span className="size-2 animate-pulse rounded-full bg-emerald-500" />}
+                {verifying ? 'Verification running' : vStatus.state === 'done' ? 'Last verification completed' : 'Last verification failed'}
+                <span className="font-normal text-neutral-500">
+                  · {vStatus.ticket ? `ticket #${vStatus.ticket}` : 'all open tickets'} · {vStatus.started_at}
+                </span>
+              </div>
+              {vStatus.log.length > 0 && (
+                <pre className="max-h-28 overflow-auto rounded bg-neutral-950 p-2 font-mono text-[10px] leading-relaxed text-neutral-200">
+                  {vStatus.log.join('\n')}
+                </pre>
+              )}
+            </div>
+          )}
+          {tickets.length === 0 ? (
+            <p className="py-6 text-center text-xs text-neutral-400">No open tickets.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b text-left text-neutral-500">
+                    <th className="py-2 pr-3 font-medium">#</th>
+                    <th className="py-2 pr-3 font-medium">Ticket</th>
+                    <th className="py-2 pr-3 font-medium">Labels</th>
+                    <th className="py-2 pr-3 font-medium">SLA due</th>
+                    <th className="py-2 text-right font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tickets.map((t) => {
+                    const overdue = t.due_date ? new Date(t.due_date) < new Date() : false;
+                    return (
+                      <tr key={t.number} className="border-b last:border-0">
+                        <td className="py-2 pr-3 font-mono text-neutral-400">{t.number}</td>
+                        <td className="py-2 pr-3">
+                          <a href={t.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{t.title}</a>
+                        </td>
+                        <td className="py-2 pr-3">{t.labels.map((l) => <LabelChip key={l.name} {...l} />)}</td>
+                        <td className={cn('py-2 pr-3 tabular-nums', overdue && 'font-semibold text-red-600')}>
+                          {t.due_date ?? '—'}
+                        </td>
+                        <td className="py-2 text-right">
+                          <button
+                            onClick={() => runVerify(t.number)}
+                            disabled={verifying}
+                            className="rounded border px-2 py-1 font-medium hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-neutral-800"
+                          >
+                            Verify
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 
         {/* bottom row */}
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card title="Remediation tickets" subtitle="Open Gitea issues created by the n8n workflow">
-            {tickets.length === 0 ? (
-              <p className="py-6 text-center text-xs text-neutral-400">No open tickets yet.</p>
+          <Card title="Verification evidence" subtitle="Latest rescans (tickets/verification_log.jsonl)">
+            {verifications.length === 0 ? (
+              <p className="py-6 text-center text-xs text-neutral-400">No verification yet.</p>
             ) : (
               <div className="space-y-2">
-                {tickets.slice(0, 6).map((t) => (
-                  <a
-                    key={t.number}
-                    href={t.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block rounded border px-3 py-2 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-900"
-                  >
-                    <span className="mr-2 font-mono text-neutral-400">#{t.number}</span>
-                    {t.title}
-                  </a>
+                {verifications.map((v, i) => (
+                  <div key={`${v.ticket}-${i}`} className="border-b pb-2 text-xs last:border-0">
+                    <div className="flex items-center justify-between">
+                      <span>
+                        <span className="mr-2 font-mono text-neutral-400">#{v.ticket}</span>
+                        <span className="font-mono">{v.cve}</span>
+                      </span>
+                      <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold text-white', v.result === 'fixed' ? 'bg-emerald-600' : 'bg-red-600')}>
+                        {v.result === 'fixed' ? 'FIXED' : 'STILL PRESENT'}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-neutral-500">
+                      {v.image} · {v.verified_at.replace('T', ' ').slice(0, 16)}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

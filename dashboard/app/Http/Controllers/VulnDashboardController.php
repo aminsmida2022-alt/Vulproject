@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\GiteaTicketService;
+use App\Services\VerificationService;
 use App\Services\VulnDataService;
 use App\Services\VulnScanService;
-use App\Services\GiteaTicketService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -14,8 +15,8 @@ class VulnDashboardController extends Controller
         private VulnDataService $data,
         private VulnScanService $scanService,
         private GiteaTicketService $tickets,
-    ) {
-    }
+        private VerificationService $verification,
+    ) {}
 
     public function index()
     {
@@ -25,7 +26,11 @@ class VulnDashboardController extends Controller
             'inventory' => $this->data->inventory(),
             'history' => $this->data->scanHistory(),
             'scanStatus' => $this->scanService->status(),
-            'tickets' => $this->tickets->openIssues(),        ]);
+            'tickets' => $this->tickets->openIssues(),
+            'closedTickets' => $this->tickets->closedIssues(),
+            'verifyStatus' => $this->verification->status(),
+            'verifications' => $this->verification->history(),
+        ]);
     }
 
     /**
@@ -47,5 +52,26 @@ class VulnDashboardController extends Controller
     public function scanStatus()
     {
         return response()->json($this->scanService->status());
+    }
+
+    /** Phase 8: rescan + close/keep-open one ticket (or all open ones). */
+    public function verify(Request $request)
+    {
+        $validated = $request->validate([
+            'ticket' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $result = $this->verification->start($validated['ticket'] ?? null);
+
+        if (! $result['started']) {
+            return back()->with('warning', $result['reason']);
+        }
+
+        return back()->with('success', 'Verification started.');
+    }
+
+    public function verifyStatus()
+    {
+        return response()->json($this->verification->status());
     }
 }
