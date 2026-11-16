@@ -14,3 +14,4 @@ dashboard/.env
 dashboard/storage/*.key
 dashboard/database/database.sqlite
 streamlit/.venv/
+documentation/report-kit.zip

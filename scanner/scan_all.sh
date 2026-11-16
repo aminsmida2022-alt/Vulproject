@@ -14,8 +14,12 @@ mkdir -p "$CACHE_DIR"
 # Offline mode: use the locally extracted DB if present (skip download)
 SKIP_FLAGS=""
 if [ -f "$CACHE_DIR/db/trivy.db" ]; then
-  SKIP_FLAGS="--skip-db-update"
+  SKIP_FLAGS="--skip-db-update --offline-scan"
   echo "[*] Using local Trivy DB in $CACHE_DIR/db (skip download)"
+fi
+if [ -f "$CACHE_DIR/java-db/trivy-java.db" ]; then
+  SKIP_FLAGS="$SKIP_FLAGS --skip-java-db-update"
+  echo "[*] Using local Java DB in $CACHE_DIR/java-db (skip download)"
 fi
 
 scan() {
