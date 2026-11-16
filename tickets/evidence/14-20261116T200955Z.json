@@ -1,0 +1,29 @@
+{
+  "ticket": 14,
+  "priority": "P1-CRITICAL",
+  "cve": "CVE-2023-44487",
+  "asset_id": "web-server",
+  "asset_name": "Web Server",
+  "image": "nginx:1.18.0",
+  "image_id": "sha256:c2c45d506085d300b72a6d4b10e3dce104228080a2cf095fc38333afe237e2be",
+  "repo_digests": [
+    "nginx@sha256:e90ac5331fe095cea01b121a3627174b2e33e06e83720e9a934c7b8ccc9c55a0"
+  ],
+  "scanned_at": "2026-11-16T20:02:21.04966619Z",
+  "scanner": "trivy",
+  "trivy_db_updated_at": "2026-11-15T18:56:37.733847835Z",
+  "report_file": "scanner/reports/web-server.json",
+  "report_sha256": "9af2835202776c829a007b6c7b6206c2a74acce01e0713e0fc144b3defea6df3",
+  "total_vulnerabilities": 423,
+  "verified_at": "2026-11-16T20:09:55+00:00",
+  "result": "still-present",
+  "matches": [
+    {
+      "target": "nginx:1.18.0 (debian 10.9)",
+      "pkg": "libnghttp2-14",
+      "installed": "1.36.0-2+deb10u1",
+      "fixed": "1.36.0-2+deb10u2"
+    }
+  ],
+  "evidence_file": "tickets/evidence/14-20261116T200955Z.json"
+}

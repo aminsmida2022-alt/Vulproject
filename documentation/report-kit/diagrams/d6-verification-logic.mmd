@@ -1,0 +1,9 @@
+flowchart TD
+    S["Analyst clicks Verify<br/>(one ticket or all)"] --> P["parse ticket title<br/>CVE + asset"]
+    P --> I["inventory lookup<br/>current image"]
+    I --> T["Trivy rescan<br/>(offline DB)"]
+    T --> Q{"CVE still in<br/>the report?"}
+    Q -- no --> OK["evidence comment<br/>label verified-fixed<br/>CLOSE ticket"]
+    Q -- yes --> KO["evidence comment<br/>label verification-failed<br/>ticket stays open"]
+    OK --> E[("tickets/evidence/*.json<br/>image ID, scan time,<br/>DB version, SHA-256")]
+    KO --> E

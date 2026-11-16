@@ -1,0 +1,29 @@
+{
+  "ticket": 9,
+  "priority": "P1-CRITICAL",
+  "cve": "CVE-2023-4863",
+  "asset_id": "web-server",
+  "asset_name": "Web Server",
+  "image": "nginx:1.18.0",
+  "image_id": "sha256:c2c45d506085d300b72a6d4b10e3dce104228080a2cf095fc38333afe237e2be",
+  "repo_digests": [
+    "nginx@sha256:e90ac5331fe095cea01b121a3627174b2e33e06e83720e9a934c7b8ccc9c55a0"
+  ],
+  "scanned_at": "2026-11-16T20:12:58.877657722Z",
+  "scanner": "trivy",
+  "trivy_db_updated_at": "2026-11-15T18:56:37.733847835Z",
+  "report_file": "scanner/reports/web-server.json",
+  "report_sha256": "19873f078ecf9f619c188d821b2abd9df46ff59b3c08cf3185cfe7a65d409b7a",
+  "total_vulnerabilities": 423,
+  "verified_at": "2026-11-16T20:12:59+00:00",
+  "result": "still-present",
+  "matches": [
+    {
+      "target": "nginx:1.18.0 (debian 10.9)",
+      "pkg": "libwebp6",
+      "installed": "0.6.1-2",
+      "fixed": "0.6.1-2+deb10u3"
+    }
+  ],
+  "evidence_file": "tickets/evidence/9-20261116T201259Z.json"
+}

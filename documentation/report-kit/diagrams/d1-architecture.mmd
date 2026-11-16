@@ -1,0 +1,26 @@
+flowchart LR
+    DASH["Dashboard<br/>Laravel 12 + React<br/>Start Scan · Verify"]
+    subgraph A["1 · Scan"]
+        INV[("Asset inventory<br/>3 lab images")] --> TRIVY["Trivy<br/>offline vuln DB"]
+    end
+    subgraph B["2 · Enrich + prioritize"]
+        ENR["enrich.py<br/>dedupe + score<br/>P = 0.25C + 0.30E + 0.25K + 0.20A"]
+    end
+    subgraph C["3 · Orchestrate (SOAR)"]
+        N8N["n8n<br/>triage · SLA · escalation"]
+    end
+    subgraph D["4 · Track"]
+        GITEA["Gitea<br/>remediation tickets"]
+    end
+    subgraph E["5 · Verify"]
+        VER["verify.py<br/>rescan + evidence"]
+    end
+    EPSS["FIRST EPSS API"] --> ENR
+    KEV["CISA KEV catalogue"] --> ENR
+    TRIVY -- "JSON reports" --> ENR
+    ENR -- "ranked findings" --> N8N
+    N8N -- "create / reopen" --> GITEA
+    DASH -- "Start Scan" --> TRIVY
+    DASH -- "Verify" --> VER
+    VER -- "rescan" --> TRIVY
+    VER -- "close or keep open" --> GITEA

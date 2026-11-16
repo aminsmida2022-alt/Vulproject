@@ -1,0 +1,22 @@
+{
+  "ticket": 2,
+  "priority": "P1-CRITICAL",
+  "cve": "CVE-2021-44228",
+  "asset_id": "db-server",
+  "asset_name": "Database Server",
+  "image": "postgres:11.0",
+  "image_id": "sha256:7a2907672aabc8acef32a62a1e0af63bc3e461377376a9201e45a87be3f075c2",
+  "repo_digests": [
+    "postgres@sha256:76ff79d72ef95b7c136037c0e8ab629914a8d5e430a3a2aef7d959b5da9a33c5"
+  ],
+  "scanned_at": "2026-11-16T20:04:09.846243324Z",
+  "scanner": "trivy",
+  "trivy_db_updated_at": "2026-11-15T18:56:37.733847835Z",
+  "report_file": "scanner/reports/db-server.json",
+  "report_sha256": "e88244df9d4fc9dbcb10d5cbcc7adabe9e50bee67f9e888cdf4ca9d9313a8d56",
+  "total_vulnerabilities": 654,
+  "verified_at": "2026-11-16T20:09:55+00:00",
+  "result": "fixed",
+  "matches": [],
+  "evidence_file": "tickets/evidence/2-20261116T200955Z.json"
+}

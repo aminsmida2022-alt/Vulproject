@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    actor Analyst
+    participant D as Dashboard
+    participant T as Trivy
+    participant E as enrich.py
+    participant N as n8n
+    participant G as Gitea
+    participant V as verify.py
+
+    Analyst->>D: Start Scan (or 02:00 schedule)
+    D->>T: scan_all.sh (each asset in inventory)
+    T-->>D: reports/<asset>.json
+    D->>E: enrich.py
+    E->>E: dedupe, EPSS + KEV lookup, P = 0.25C+0.30E+0.25K+0.20A
+    E-->>D: findings.json (ranked)
+    D->>N: POST findings to webhook
+    N->>G: list existing issues (dedupe key = CVE + asset)
+    N->>G: create P1/P2 issues (labels, SLA due date)
+    Note over N,G: daily: reminder at 75% SLA, escalation when overdue
+    Analyst->>Analyst: patch the asset (upgrade image / package)
+    Analyst->>D: Verify ticket
+    D->>V: verify.py --ticket N
+    V->>T: rescan the asset
+    alt CVE gone
+        V->>G: evidence comment + verified-fixed + close
+    else CVE still present
+        V->>G: evidence comment + verification-failed (stays open)
+    end
+    Note over N,G: next scan: CVE back on a closed ticket -> reopen + regression

@@ -1,0 +1,22 @@
+{
+  "ticket": 9,
+  "priority": "P1-CRITICAL",
+  "cve": "CVE-2023-4863",
+  "asset_id": "web-server",
+  "asset_name": "Web Server",
+  "image": "nginx:1.28.0",
+  "image_id": "sha256:34e04bb6b4bb37d45845842374be0cd181723daffb230849b1984aaeaa96faba",
+  "repo_digests": [
+    "nginx@sha256:552e7481ca93ffccd046aa658dbbed22caefbc09c66fa7cd247cbb90b8a5c609"
+  ],
+  "scanned_at": "2026-11-16T20:16:11.9105144Z",
+  "scanner": "trivy",
+  "trivy_db_updated_at": "2026-11-15T18:56:37.733847835Z",
+  "report_file": "scanner/reports/web-server.json",
+  "report_sha256": "a608720b2cbd5ffc9e724d5d56d49f67df20584c42f031241c21315438a48e83",
+  "total_vulnerabilities": 792,
+  "verified_at": "2026-11-16T20:16:12+00:00",
+  "result": "fixed",
+  "matches": [],
+  "evidence_file": "tickets/evidence/9-20261116T201612Z.json"
+}

@@ -1,0 +1,35 @@
+{
+  "ticket": 15,
+  "priority": "P2-HIGH",
+  "cve": "CVE-2023-4911",
+  "asset_id": "test-server",
+  "asset_name": "Test Server",
+  "image": "python:3.7-slim",
+  "image_id": "sha256:a255ffcb469f2ec40f2958a76beb0c2bbebfe92ce9af67a9b48d84b4cb695ac8",
+  "repo_digests": [
+    "python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b"
+  ],
+  "scanned_at": "2026-11-16T20:40:35.189853889Z",
+  "scanner": "trivy",
+  "trivy_db_updated_at": "2026-11-15T18:56:37.733847835Z",
+  "report_file": "scanner/reports/test-server.json",
+  "report_sha256": "741c25ebce76e0aace149b316df7bdfbfec139f5204fd97cd18be4f904f9829c",
+  "total_vulnerabilities": 691,
+  "verified_at": "2026-11-16T20:40:35+00:00",
+  "result": "still-present",
+  "matches": [
+    {
+      "target": "python:3.7-slim (debian 12.1)",
+      "pkg": "libc-bin",
+      "installed": "2.36-9+deb12u1",
+      "fixed": "2.36-9+deb12u3"
+    },
+    {
+      "target": "python:3.7-slim (debian 12.1)",
+      "pkg": "libc6",
+      "installed": "2.36-9+deb12u1",
+      "fixed": "2.36-9+deb12u3"
+    }
+  ],
+  "evidence_file": "tickets/evidence/15-20261116T204035Z.json"
+}

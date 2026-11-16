@@ -6,47 +6,36 @@ Automated vulnerability management system that identifies, prioritizes, tracks a
 
 | Component | Technology | Port |
 |---|---|---|
+| Dashboard | Laravel 12 + Inertia (React) | 8000 |
 | SOAR automation | n8n (Docker) | 5678 |
-| Ticket management | Gitea (Docker) | 3000 |
-| Vulnerability scanner | Trivy (Docker) | — |
-| Dashboard | Streamlit (Python) | 8501 |
-| Enrichment | EPSS API + CISA KEV | online |
+| Ticket management | Gitea + PostgreSQL (Docker) | 3001 |
+| Vulnerability scanner | Trivy (Docker, offline DB) | - |
+| Enrichment | FIRST EPSS API + CISA KEV | online |
 
-## Structure
+## Pipeline
 
-```text
-vulnerability-management/
-│
-├── docker-compose.yml        # n8n, Gitea, lab containers
-├── n8n/workflows/            # exported n8n workflows (JSON)
-├── scanner/
-│   ├── reports/              # Trivy JSON reports
-│   └── configurations/       # scan configs / asset inventory
-├── dashboard/
-│   ├── app.py                # Streamlit dashboard
-│   ├── requirements.txt
-│   └── components/
-├── data/
-│   ├── assets/               # asset inventory (importance levels)
-│   └── vulnerabilities/      # normalized findings + priority scores
-├── tickets/                  # ticket export / state tracking
-├── documentation/            # install & usage guides
-└── README.md
-```
+1. **Scan** - `scanner/scan_all.sh` scans every asset of `data/assets/inventory.json` with Trivy.
+2. **Enrich + prioritize** - `scripts/enrich.py` dedupes, adds EPSS + KEV, computes P.
+3. **Ticket** - n8n creates Gitea tickets for P1/P2 with SLA due dates (dedupe, regression reopen, risk acceptance).
+4. **SLA** - n8n reminds at 75% of the SLA and escalates overdue tickets.
+5. **Verify** - `scripts/verify.py` rescans; closes the ticket only if the CVE is gone, with evidence.
+6. **Evaluate** - `scripts/evaluate.py` compares contextual priority with CVSS-only.
+
+## Documentation
+
+- [Installation & usage](documentation/installation.md)
+- [Architecture diagrams](documentation/architecture.md)
+- [Test report (6 scenarios)](documentation/testing.md)
+- [Evaluation vs CVSS-only](documentation/evaluation.md)
 
 ## Quick start
 
 ```bash
-# 1. Start core services
-docker compose up -d
-
-# 2. Dashboard
-cd dashboard && pip3 install -r requirements.txt && streamlit run app.py
-
-# 3. A manual scan test
-docker run --rm -v $(pwd)/scanner/reports:/reports aquasec/trivy image \
-  --format json --output /reports/report.json nginx:1.18.0
+docker compose up -d                       # n8n + Gitea
+cd dashboard && composer setup && composer dev   # http://localhost:8000
 ```
+
+Full setup (Gitea token, labels, n8n import): see the installation guide.
 
 ## Priority formula
 

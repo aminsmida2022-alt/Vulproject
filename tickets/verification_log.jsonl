@@ -1,0 +1,10 @@
+{"ticket": 2, "cve": "CVE-2021-44228", "asset_id": "db-server", "image": "postgres:11.0", "result": "fixed", "verified_at": "2026-11-16T20:09:55+00:00", "evidence_file": "tickets/evidence/2-20261116T200955Z.json"}
+{"ticket": 14, "cve": "CVE-2023-44487", "asset_id": "web-server", "image": "nginx:1.18.0", "result": "still-present", "verified_at": "2026-11-16T20:09:55+00:00", "evidence_file": "tickets/evidence/14-20261116T200955Z.json"}
+{"ticket": 9, "cve": "CVE-2023-4863", "asset_id": "web-server", "image": "nginx:1.18.0", "result": "still-present", "verified_at": "2026-11-16T20:12:59+00:00", "evidence_file": "tickets/evidence/9-20261116T201259Z.json"}
+{"ticket": 4, "cve": "CVE-2022-2068", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/4-20261116T201612Z.json"}
+{"ticket": 7, "cve": "CVE-2023-50387", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/7-20261116T201612Z.json"}
+{"ticket": 9, "cve": "CVE-2023-4863", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/9-20261116T201612Z.json"}
+{"ticket": 10, "cve": "CVE-2021-3711", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/10-20261116T201612Z.json"}
+{"ticket": 12, "cve": "CVE-2024-2961", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/12-20261116T201612Z.json"}
+{"ticket": 14, "cve": "CVE-2023-44487", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/14-20261116T201612Z.json"}
+{"ticket": 15, "cve": "CVE-2023-4911", "asset_id": "test-server", "image": "python:3.7-slim", "result": "still-present", "verified_at": "2026-11-16T20:40:35+00:00", "evidence_file": "tickets/evidence/15-20261116T204035Z.json"}

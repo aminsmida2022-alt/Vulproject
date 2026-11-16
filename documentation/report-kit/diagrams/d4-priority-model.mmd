@@ -1,0 +1,8 @@
+flowchart LR
+    C["CVSS v3<br/>x10 -> 0-100"] -- "x 0.25" --> P(("P"))
+    E["EPSS<br/>x100 -> 0-100"] -- "x 0.30" --> P
+    K["CISA KEV<br/>0 or 100"] -- "x 0.25" --> P
+    A["Asset importance<br/>0-100"] -- "x 0.20" --> P
+    P --> L1["P1 >= 80 · SLA 7 d"]
+    P --> L2["P2 >= 60 · SLA 30 d"]
+    P --> L3["P3-P5 · no ticket"]
