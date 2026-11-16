@@ -31,7 +31,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=token={{ $env.N8N_GITEA_TOKEN }}" }
+            { "name": "Authorization", "value": "token ***REMOVED***" },
+            { "name": "Accept", "value": "application/json" }
           ]
         },
         "options": {}
@@ -40,7 +41,8 @@
       "name": "Check open ticket (dedupe)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [200, 0]
+      "position": [200, 0],
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -53,9 +55,9 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ Number($json.total_count) }}",
-              "rightValue": 0,
-              "operator": { "type": "number", "operation": "equals" }
+              "leftValue": "={{ $json.number === undefined }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
             }
           ],
           "combinator": "and"
@@ -75,13 +77,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=token={{ $env.N8N_GITEA_TOKEN }}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "Authorization", "value": "token ***REMOVED***" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{\n  const f = $('Extract + Filter P1/P2').item.json;\n  const kev = f.kev ? '**YES — actively exploited in the wild (CISA KEV)**' : 'No';\n  const fix = f.fixed ? '`' + f.fixed + '`' : '_no fixed version available_';\n  const epss = f.epss != null ? (f.epss * 100).toFixed(2) + '%' : 'unknown';\n  JSON.stringify({\n    title: `[${f.priority}] Fix ${f.cve} on ${f.asset_name}`,\n    body: [\n      '## Remediation ticket',\n      '',\n      '| Field | Value |',\n      '|---|---|',\n      `| CVE | ${f.cve} |`,\n      `| Asset | ${f.asset_name} (${f.asset_criticality} importance) |`,\n      `| Package | ${f.pkg} — installed \\`${f.installed}\\`, fixed in ${fix} |`,\n      `| Severity | ${f.severity} (CVSS ${f.cvss}) |`,\n      `| EPSS exploitation probability | ${epss} |`,\n      `| CISA KEV listed | ${kev} |`,\n      `| Contextual priority | **${f.priority_score} / 100 → ${f.priority}** |`,\n      '',\n      `> ${f.title ?? ''}`,',\n      '',\n      '### Priority formula',\n      '`P = 0.25*CVSS + 0.30*EPSS + 0.25*KEV + 0.20*Asset importance`',\n      '',\n      '### Acceptance criteria',\n      '- [ ] Apply the fix (upgrade package or rebuild image)',\n      '- [ ] Request verification scan',\n      '- [ ] Ticket is closed ONLY if a new scan proves the finding is gone'\n    ].join('\\n')\n  })\n}}",
+        "jsonBody": "={{ JSON.stringify((function(){ var f = $('Extract + Filter P1/P2').item.json; var kev = f.kev ? 'YES - actively exploited in the wild (CISA KEV)' : 'No'; var fix = f.fixed ? f.fixed : 'no fixed version available'; var epss = f.epss != null ? (f.epss * 100).toFixed(2) + '%' : 'unknown'; var lines = [ '## Remediation ticket', '', '| Field | Value |', '|---|---|', '| CVE | ' + f.cve + ' |', '| Asset | ' + f.asset_name + ' (' + f.asset_criticality + ' importance) |', '| Package | ' + f.pkg + ' - installed ' + f.installed + ', fixed in ' + fix + ' |', '| Severity | ' + f.severity + ' (CVSS ' + f.cvss + ') |', '| EPSS exploitation probability | ' + epss + ' |', '| CISA KEV listed | ' + kev + ' |', '| Contextual priority | ' + f.priority_score + ' / 100 - ' + f.priority + ' |', '', '> ' + (f.title || ''), '', '### Priority formula', 'P = 0.25*CVSS + 0.30*EPSS + 0.25*KEV + 0.20*Asset importance', '', '### Acceptance criteria', '- [ ] Apply the fix (upgrade package or rebuild image)', '- [ ] Request verification scan', '- [ ] Ticket is closed ONLY if a new scan proves the finding is gone' ]; return { title: '[' + f.priority + '] Fix ' + f.cve + ' on ' + f.asset_name, body: lines.join('\\n') }; })()) }}",
         "options": {}
       },
       "id": "a1b2c3d4-0005-4a05-b005-vulnmgmt0005",
