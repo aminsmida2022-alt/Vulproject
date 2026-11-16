@@ -1,0 +1,117 @@
+{
+  "name": "Vuln Management - Findings to Tickets",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vuln-findings",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4a01-b001-vulnmgmt0001",
+      "name": "Findings Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, 0],
+      "webhookId": "vuln-findings"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the enriched findings array from the webhook body\nconst payload = $input.first().json;\nconst body = payload.body ?? payload;\nconst findings = Array.isArray(body) ? body : (body.findings ?? [body]);\n\n// Only ticket-worthy findings: P1-CRITICAL or P2-HIGH (score >= 60)\nconst threshold = 60;\n\nreturn findings\n  .filter(f => (f.priority_score ?? 0) >= threshold)\n  .map(f => ({ json: f }));"
+      },
+      "id": "a1b2c3d4-0002-4a02-b002-vulnmgmt0002",
+      "name": "Extract + Filter P1/P2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues?state=open&q={{ $json.cve }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=token={{ $env.N8N_GITEA_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-4a03-b003-vulnmgmt0003",
+      "name": "Check open ticket (dedupe)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ Number($json.total_count) }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0004-4a04-b004-vulnmgmt0004",
+      "name": "No open ticket yet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=token={{ $env.N8N_GITEA_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  const f = $('Extract + Filter P1/P2').item.json;\n  const kev = f.kev ? '**YES — actively exploited in the wild (CISA KEV)**' : 'No';\n  const fix = f.fixed ? '`' + f.fixed + '`' : '_no fixed version available_';\n  const epss = f.epss != null ? (f.epss * 100).toFixed(2) + '%' : 'unknown';\n  JSON.stringify({\n    title: `[${f.priority}] Fix ${f.cve} on ${f.asset_name}`,\n    body: [\n      '## Remediation ticket',\n      '',\n      '| Field | Value |',\n      '|---|---|',\n      `| CVE | ${f.cve} |`,\n      `| Asset | ${f.asset_name} (${f.asset_criticality} importance) |`,\n      `| Package | ${f.pkg} — installed \\`${f.installed}\\`, fixed in ${fix} |`,\n      `| Severity | ${f.severity} (CVSS ${f.cvss}) |`,\n      `| EPSS exploitation probability | ${epss} |`,\n      `| CISA KEV listed | ${kev} |`,\n      `| Contextual priority | **${f.priority_score} / 100 → ${f.priority}** |`,\n      '',\n      `> ${f.title ?? ''}`,',\n      '',\n      '### Priority formula',\n      '`P = 0.25*CVSS + 0.30*EPSS + 0.25*KEV + 0.20*Asset importance`',\n      '',\n      '### Acceptance criteria',\n      '- [ ] Apply the fix (upgrade package or rebuild image)',\n      '- [ ] Request verification scan',\n      '- [ ] Ticket is closed ONLY if a new scan proves the finding is gone'\n    ].join('\\n')\n  })\n}}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0005-4a05-b005-vulnmgmt0005",
+      "name": "Create Gitea ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 0]
+    }
+  ],
+  "connections": {
+    "Findings Webhook": {
+      "main": [[{ "node": "Extract + Filter P1/P2", "type": "main", "index": 0 }]]
+    },
+    "Extract + Filter P1/P2": {
+      "main": [[{ "node": "Check open ticket (dedupe)", "type": "main", "index": 0 }]]
+    },
+    "Check open ticket (dedupe)": {
+      "main": [[{ "node": "No open ticket yet?", "type": "main", "index": 0 }]]
+    },
+    "No open ticket yet?": {
+      "main": [
+        [{ "node": "Create Gitea ticket", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": {
+    "description": "Receives enriched findings from the Laravel dashboard, filters P1/P2, dedupes against open Gitea tickets and creates remediation tickets."
+  }
+}

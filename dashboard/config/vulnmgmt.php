@@ -18,4 +18,16 @@ return [
     */
     'scan_script' => 'scanner/scan_all.sh',
     'enrich_script' => 'python3 scripts/enrich.py',
+
+    /*
+    | SOAR integration: n8n webhook that receives the enriched findings
+    | after every scan, and Gitea API for the tickets panel.
+    */
+    'n8n_webhook' => env('VULNMGMT_N8N_WEBHOOK', 'http://localhost:5678/webhook/vuln-findings'),
+
+    'gitea' => [
+        'url' => env('VULNMGMT_GITEA_URL', 'http://localhost:3001'),
+        'token' => env('VULNMGMT_GITEA_TOKEN', '***REMOVED***'),
+        'repo' => env('VULNMGMT_GITEA_REPO', 'vulnadmin/remediation-tickets'),
+    ],
 ];

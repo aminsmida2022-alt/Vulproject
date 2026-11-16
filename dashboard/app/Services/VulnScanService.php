@@ -52,7 +52,10 @@ class VulnScanService
             escapeshellarg(
                 'cd '.escapeshellarg($root).' && '.
                 'bash '.config('vulnmgmt.scan_script').' && '.
-                config('vulnmgmt.enrich_script')
+                config('vulnmgmt.enrich_script').' && '.
+                'curl -sf -m 30 -X POST -H "Content-Type: application/json" '.
+                '--data-binary @data/vulnerabilities/findings.json '.
+                config('vulnmgmt.n8n_webhook').' || true'
             ),
             escapeshellarg($log)
         );

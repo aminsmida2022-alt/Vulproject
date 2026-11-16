@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\VulnDataService;
 use App\Services\VulnScanService;
+use App\Services\GiteaTicketService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -12,6 +13,7 @@ class VulnDashboardController extends Controller
     public function __construct(
         private VulnDataService $data,
         private VulnScanService $scanService,
+        private GiteaTicketService $tickets,
     ) {
     }
 
@@ -23,7 +25,7 @@ class VulnDashboardController extends Controller
             'inventory' => $this->data->inventory(),
             'history' => $this->data->scanHistory(),
             'scanStatus' => $this->scanService->status(),
-        ]);
+            'tickets' => $this->tickets->openIssues(),        ]);
     }
 
     /**

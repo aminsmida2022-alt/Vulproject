@@ -1,24 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { scan } from '@/routes/vuln';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
 type Finding = {
@@ -26,7 +8,6 @@ type Finding = {
   asset_name: string;
   pkg: string;
   installed: string;
-  fixed: string | null;
   severity: string;
   cvss: number;
   epss: number;
@@ -42,13 +23,20 @@ type Asset = {
   image: string;
   criticality: string;
   importance: number;
-  owner: string;
 };
 
 type History = {
   asset_id: string;
   findings: number;
   scanned_at: string;
+};
+
+type Ticket = {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  created_at: string;
 };
 
 type AssetProgress = {
@@ -84,50 +72,189 @@ type Props = {
   inventory: Asset[];
   history: History[];
   scanStatus: ScanStatus;
+  tickets: Ticket[];
 };
 
-const PRIORITY_STYLES: Record<string, string> = {
-  'P1-CRITICAL': 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
-  'P2-HIGH': 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300',
-  'P3-MEDIUM': 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-  'P4-LOW': 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
-  'P5-INFORMATIONAL': 'bg-neutral-100 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300',
+const P_COLORS: Record<string, string> = {
+  'P1-CRITICAL': '#dc2626',
+  'P2-HIGH': '#ea580c',
+  'P3-MEDIUM': '#d97706',
+  'P4-LOW': '#0284c7',
+  'P5-INFORMATIONAL': '#94a3b8',
 };
 
-function scoreColor(score: number) {
-  if (score >= 80) return 'bg-red-500';
-  if (score >= 60) return 'bg-orange-500';
-  if (score >= 40) return 'bg-amber-500';
-  if (score >= 20) return 'bg-sky-500';
-  return 'bg-neutral-400';
+/* ---------- charts (pure SVG/CSS, Tableau-style) ---------- */
+
+function HBar({
+  label,
+  value,
+  max,
+  color,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+}) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <div className="w-32 shrink-0 text-right text-xs text-neutral-600">{label}</div>
+      <div className="flex flex-1 items-center gap-2">
+        <div className="h-4 flex-1 rounded-sm bg-neutral-100">
+          <div
+            className="h-4 rounded-sm transition-all"
+            style={{ width: `${Math.max(pct, value > 0 ? 1.5 : 0)}%`, background: color }}
+          />
+        </div>
+        <div className="w-8 text-right text-xs font-semibold tabular-nums text-neutral-800">
+          {value}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default function VulnOverview({ stats, findings, inventory, history, scanStatus }: Props) {
+function Donut({
+  segments,
+  total,
+}: {
+  segments: { label: string; value: number; color: string }[];
+  total: number;
+}) {
+  const r = 54;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  const shown = segments.filter((s) => s.value > 0);
+
+  return (
+    <div className="flex items-center justify-center gap-6 py-2">
+      <svg viewBox="0 0 140 140" className="size-[140px]">
+        <circle cx="70" cy="70" r={r} fill="none" stroke="#f1f5f9" strokeWidth="16" />
+        {shown.map((s) => {
+          const frac = total ? s.value / total : 0;
+          const el = (
+            <circle
+              key={s.label}
+              cx="70"
+              cy="70"
+              r={r}
+              fill="none"
+              stroke={s.color}
+              strokeWidth="16"
+              strokeDasharray={`${frac * c} ${c}`}
+              strokeDashoffset={-offset * c}
+              transform="rotate(-90 70 70)"
+            />
+          );
+          offset += frac;
+          return el;
+        })}
+        <text x="70" y="66" textAnchor="middle" className="fill-neutral-900 text-[20px] font-semibold">
+          {total}
+        </text>
+        <text x="70" y="84" textAnchor="middle" className="fill-neutral-400 text-[9px]">
+          FINDINGS
+        </text>
+      </svg>
+      <div className="space-y-1.5">
+        {segments.map((s) => (
+          <div key={s.label} className="flex items-center gap-2 text-xs">
+            <span className="size-2.5 rounded-sm" style={{ background: s.color }} />
+            <span className="text-neutral-600">{s.label}</span>
+            <span className="ml-auto pl-3 font-semibold tabular-nums">{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Scatter({ data }: { data: Finding[] }) {
+  const W = 340;
+  const H = 180;
+  const px = (v: number) => (v / 10) * W;
+  const py = (v: number) => H - v * H;
+
+  return (
+    <div className="px-2 py-3">
+      <svg viewBox={`0 0 ${W} ${H + 30}`} className="w-full">
+        {[0, 0.25, 0.5, 0.75, 1].map((g) => (
+          <g key={g}>
+            <line x1={0} x2={W} y1={H - g * H} y2={H - g * H} stroke="#f1f5f9" strokeWidth="1" />
+            <text x={-6} y={H - g * H + 3} textAnchor="end" className="fill-neutral-400 text-[8px]">
+              {Math.round(g * 100)}
+            </text>
+          </g>
+        ))}
+        {[0, 2, 4, 6, 8, 10].map((t) => (
+          <text key={t} x={px(t)} y={H + 12} textAnchor="middle" className="fill-neutral-400 text-[8px]">
+            {t}
+          </text>
+        ))}
+        {data.slice(0, 120).map((f, i) => (
+          <circle
+            key={`${f.cve}-${i}`}
+            cx={px(f.cvss ?? 0)}
+            cy={py((f.epss ?? 0) * 100)}
+            r={f.kev ? 5 : 3}
+            fill={f.kev ? '#dc2626' : '#0ea5e9'}
+            fillOpacity={f.kev ? 0.9 : 0.45}
+          />
+        ))}
+        <text x={W / 2} y={H + 26} textAnchor="middle" className="fill-neutral-400 text-[9px]">
+          CVSS score →
+        </text>
+      </svg>
+      <div className="mt-1 flex justify-center gap-4 text-xs">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-sky-500/50" /> standard
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-red-600" /> CISA KEV (actively exploited)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Card({ title, subtitle, children, className }: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('rounded-lg border bg-white p-4 shadow-xs dark:bg-neutral-950', className)}>
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{title}</h3>
+        {subtitle && <p className="text-xs text-neutral-500">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ---------- page ---------- */
+
+export default function VulnOverview({ stats, findings, inventory, history, scanStatus, tickets }: Props) {
   const scanForm = useForm({});
   const [status, setStatus] = useState<ScanStatus>(scanStatus);
   const [polling, setPolling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // keep local status in sync when the server sends a fresh one
   useEffect(() => {
-    if (scanStatus.state !== 'idle') {
-      setStatus(scanStatus);
-    }
+    if (scanStatus.state !== 'idle') setStatus(scanStatus);
   }, [scanStatus]);
 
-  // start polling right after a page load with a scan already running
   useEffect(() => {
-    if (scanStatus.state === 'running' && !polling) {
-      startPolling();
-    }
+    if (scanStatus.state === 'running' && !polling) startPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stopPolling = () => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = null;
     setPolling(false);
   };
 
@@ -138,13 +265,12 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
         const res = await fetch('/scan/status');
         const data: ScanStatus = await res.json();
         setStatus(data);
-
         if (data.state === 'done' || data.state === 'failed') {
           stopPolling();
-          router.reload({ only: ['stats', 'findings', 'inventory', 'history'] });
+          router.reload({ only: ['stats', 'findings', 'inventory', 'history', 'tickets'] });
         }
       } catch {
-        // keep polling; transient network errors are ignored
+        /* transient errors ignored */
       }
     }, 1500);
   };
@@ -160,334 +286,257 @@ export default function VulnOverview({ stats, findings, inventory, history, scan
   };
 
   const running = polling && status.state === 'running';
-  const justFinished = status.state === 'done' || status.state === 'failed';
 
-  const progressIcon = (state: AssetProgress['state']) => {
-    if (state === 'done') return '✅';
-    if (state === 'scanned') return '🔍';
-    return '⏳';
-  };
+  const prioritySegments = [
+    { label: 'P1 Critical', value: stats.p1, color: P_COLORS['P1-CRITICAL'] },
+    { label: 'P2 High', value: stats.p2, color: P_COLORS['P2-HIGH'] },
+    { label: 'P3 Medium', value: stats.p3, color: P_COLORS['P3-MEDIUM'] },
+    { label: 'P4 Low', value: stats.p4, color: P_COLORS['P4-LOW'] },
+    { label: 'P5 Info', value: stats.p5, color: P_COLORS['P5-INFORMATIONAL'] },
+  ];
+
+  const severitySegments = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].map((sev, i) => ({
+    label: sev.charAt(0) + sev.slice(1).toLowerCase(),
+    value: findings.filter((f) => (f.severity ?? '').toUpperCase() === sev).length,
+    color: ['#7f1d1d', '#dc2626', '#d97706', '#0284c7', '#94a3b8'][i],
+  }));
+
+  const maxPriority = Math.max(stats.p1, stats.p2, stats.p3, stats.p4, stats.p5, 1);
+  const top = findings.slice(0, 8);
 
   return (
     <>
       <Head title="Vulnerability Management" />
-      <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+      <div className="flex h-full flex-1 flex-col gap-4 overflow-y-auto bg-neutral-50 p-6 dark:bg-neutral-900">
+        {/* header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
               Vulnerability Management
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Fix what matters, and prove it — P = 0.25·CVSS + 0.30·EPSS +
-              0.25·KEV + 0.20·Asset
+            <p className="text-xs text-neutral-500">
+              Fix what matters, and prove it · P = 0.25·CVSS + 0.30·EPSS + 0.25·KEV + 0.20·Asset
             </p>
           </div>
-          <Button onClick={runScan} disabled={scanForm.processing || running}>
-            {running ? (
-              <>
-                <Spinner className="size-4" />
-                Scan running...
-              </>
-            ) : scanForm.processing ? (
-              <>
-                <Spinner className="size-4" />
-                Starting...
-              </>
-            ) : (
-              'Start Scan'
+          <button
+            onClick={runScan}
+            disabled={scanForm.processing || running}
+            className={cn(
+              'flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors',
+              running || scanForm.processing
+                ? 'cursor-not-allowed bg-neutral-400'
+                : 'bg-neutral-900 hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200',
             )}
-          </Button>
+          >
+            {running && (
+              <span className="size-2 animate-pulse rounded-full bg-emerald-400" />
+            )}
+            {running ? 'Scan running…' : 'Start Scan'}
+          </button>
         </div>
 
         {scanForm.errors.scan && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {scanForm.errors.scan}
           </div>
         )}
 
-        {/* Live scan progress */}
+        {/* live scan progress */}
         {status.state !== 'idle' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {running && <Spinner className="size-4" />}
-                {running
-                  ? 'Scan in progress'
-                  : status.state === 'done'
-                    ? 'Last scan completed'
-                    : status.state === 'failed'
-                      ? 'Last scan failed'
-                      : 'Scan status'}
-              </CardTitle>
-              <CardDescription>
-                {status.started_at ? `started ${status.started_at}` : ''}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-2 sm:grid-cols-3">
-                {(status.progress ?? []).map((p) => (
-                  <div
-                    key={p.asset_id}
-                    className={cn(
-                      'rounded-md border p-3 text-sm',
-                      p.state === 'done' && 'border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950',
-                      p.state === 'scanned' && 'border-sky-300 bg-sky-50 dark:border-sky-900 dark:bg-sky-950',
-                      p.state === 'pending' && 'opacity-70',
-                    )}
-                  >
-                    <div className="flex items-center gap-2 font-medium">
-                      <span>{progressIcon(p.state)}</span>
-                      {p.name}
-                    </div>
-                    <div className="mt-1 font-mono text-xs text-muted-foreground">
-                      {p.image}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {status.log && status.log.length > 0 && (
-                <pre className="max-h-40 overflow-auto rounded-md bg-neutral-950 p-3 font-mono text-xs leading-relaxed text-neutral-100">
-                  {status.log.join('\n')}
-                </pre>
+          <div className="rounded-lg border bg-white p-4 dark:bg-neutral-950">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              {running && <span className="size-2 animate-pulse rounded-full bg-emerald-500" />}
+              {running ? 'Scan in progress' : status.state === 'done' ? 'Last scan completed' : 'Last scan failed'}
+              {status.started_at && (
+                <span className="text-xs font-normal text-neutral-500">· {status.started_at}</span>
               )}
-
-              {status.errors && status.errors.length > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 font-mono text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-                  {status.errors.join('\n')}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(status.progress ?? []).map((p) => (
+                <div
+                  key={p.asset_id}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs',
+                    p.state === 'done' && 'border-emerald-200 bg-emerald-50',
+                    p.state === 'scanned' && 'border-sky-200 bg-sky-50',
+                    p.state === 'pending' && 'opacity-50',
+                  )}
+                >
+                  <span>{p.state === 'done' ? '✅' : p.state === 'scanned' ? '🔍' : '⏳'}</span>
+                  <span className="font-medium">{p.name}</span>
+                  <span className="font-mono text-neutral-400">{p.image}</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+            {status.log && status.log.length > 0 && (
+              <pre className="mt-2 max-h-28 overflow-auto rounded bg-neutral-950 p-2 font-mono text-[10px] leading-relaxed text-neutral-200">
+                {status.log.join('\n')}
+              </pre>
+            )}
+          </div>
         )}
 
-        {/* KPI cards */}
-        <div className="grid auto-rows-min gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Unique findings</CardDescription>
-              <CardTitle className="text-3xl">{stats.total}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              across {stats.assets} scanned assets
-            </CardContent>
+        {/* KPI row */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[
+            { label: 'Total findings', value: stats.total, sub: `${stats.assets} assets scanned` },
+            { label: 'KEV exploited', value: stats.kev, sub: 'actively exploited in the wild', red: (stats.kev ?? 0) > 0 },
+            { label: 'Needs ticket (P1+P2)', value: (stats.p1 ?? 0) + (stats.p2 ?? 0), sub: 'auto-created in Gitea' },
+            { label: 'Max priority score', value: Number(stats.max_score ?? 0).toFixed(1), sub: 'out of 100' },
+          ].map((k) => (
+            <div key={k.label} className="rounded-lg border bg-white p-4 dark:bg-neutral-950">
+              <div className="text-xs font-medium text-neutral-500">{k.label}</div>
+              <div className={cn('mt-1 text-3xl font-bold tabular-nums', k.red ? 'text-red-600' : 'text-neutral-900 dark:text-white')}>
+                {k.value}
+              </div>
+              <div className="text-xs text-neutral-400">{k.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* charts row */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card title="Priority distribution" subtitle="Contextual risk (P1–P5)">
+            <div className="pt-1">
+              {prioritySegments.map((s) => (
+                <HBar key={s.label} label={s.label} value={s.value} max={maxPriority} color={s.color} />
+              ))}
+            </div>
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>KEV-listed (actively exploited)</CardDescription>
-              <CardTitle className="text-3xl text-red-600">{stats.kev}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              CISA Known Exploited Vulnerabilities
-            </CardContent>
+
+          <Card title="Severity mix" subtitle="CVSS severity classes">
+            <Donut segments={severitySegments} total={stats.total} />
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>P1 + P2 priorities</CardDescription>
-              <CardTitle className="text-3xl">{stats.p1 + stats.p2}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              require remediation tickets
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Highest priority score</CardDescription>
-              <CardTitle className="text-3xl">
-                {Number(stats.max_score ?? 0).toFixed(1)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              out of 100 (contextual risk)
-            </CardContent>
+
+          <Card title="CVSS vs EPSS" subtitle="Does real exploitability match the score?">
+            <Scatter data={findings} />
           </Card>
         </div>
 
-        {/* Priority distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Priority distribution</CardTitle>
-            <CardDescription>
-              Contextual risk ranking, not CVSS alone
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {[
-              ['P1-CRITICAL', stats.p1],
-              ['P2-HIGH', stats.p2],
-              ['P3-MEDIUM', stats.p3],
-              ['P4-LOW', stats.p4],
-              ['P5-INFORMATIONAL', stats.p5],
-            ].map(([label, count]) => {
-              const key = label as keyof typeof PRIORITY_STYLES;
-              const pct = stats.total ? ((count as number) / stats.total) * 100 : 0;
-              return (
-                <div key={key as string} className="flex items-center gap-3">
-                  <Badge className={cn('w-36 justify-center', PRIORITY_STYLES[key])}>
-                    {key}
-                  </Badge>
-                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
-                    <div
-                      className={cn('h-full rounded-full', scoreColor(count as number))}
-                      style={{ width: `${Math.max(pct, 1)}%` }}
-                    />
-                  </div>
-                  <span className="w-10 text-right text-sm tabular-nums">
-                    {count as number}
-                  </span>
-                </div>
-              );
-            })}
-          </CardContent>
+        {/* top findings */}
+        <Card title="Top findings by contextual priority" subtitle="Ranked by the weighted score — not CVSS alone">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b text-left text-neutral-500">
+                  <th className="py-2 pr-3 font-medium">Score</th>
+                  <th className="py-2 pr-3 font-medium">Priority</th>
+                  <th className="py-2 pr-3 font-medium">CVE</th>
+                  <th className="py-2 pr-3 font-medium">Asset</th>
+                  <th className="py-2 pr-3 font-medium">Package</th>
+                  <th className="py-2 pr-3 text-right font-medium">CVSS</th>
+                  <th className="py-2 pr-3 text-right font-medium">EPSS</th>
+                  <th className="py-2 font-medium">KEV</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="py-10 text-center text-neutral-400">
+                      No findings yet — click <strong>Start Scan</strong> to run the first scan.
+                    </td>
+                  </tr>
+                )}
+                {top.map((f, i) => (
+                  <tr key={`${f.cve}-${i}`} className="border-b last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <td className="py-2 pr-3 font-bold tabular-nums" style={{ color: P_COLORS[f.priority] ?? '#94a3b8' }}>
+                      {f.priority_score.toFixed(1)}
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                        style={{ background: P_COLORS[f.priority] ?? '#94a3b8' }}
+                      >
+                        {f.priority}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3 font-mono">{f.cve}</td>
+                    <td className="py-2 pr-3">{f.asset_name}</td>
+                    <td className="py-2 pr-3 text-neutral-500">
+                      {f.pkg} ({f.installed})
+                    </td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{f.cvss?.toFixed(1) ?? '—'}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">
+                      {f.epss ? `${(f.epss * 100).toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="py-2">
+                      {f.kev ? (
+                        <span className="font-semibold text-red-600">●</span>
+                      ) : (
+                        <span className="text-neutral-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {findings.length > top.length && (
+            <p className="mt-2 text-right text-xs text-neutral-400">
+              showing 8 of {findings.length} findings
+            </p>
+          )}
         </Card>
 
-        {/* Findings table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Findings</CardTitle>
-            <CardDescription>
-              Ranked by contextual priority score
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {findings.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No findings yet — click <strong>Start Scan</strong> to run the
-                first Trivy scan.
-              </p>
+        {/* bottom row */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card title="Remediation tickets" subtitle="Open Gitea issues created by the n8n workflow">
+            {tickets.length === 0 ? (
+              <p className="py-6 text-center text-xs text-neutral-400">No open tickets yet.</p>
             ) : (
-              <div className="max-h-[480px] overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background">
-                    <TableRow>
-                      <TableHead className="w-16">Score</TableHead>
-                      <TableHead className="w-36">Priority</TableHead>
-                      <TableHead>CVE</TableHead>
-                      <TableHead>Asset</TableHead>
-                      <TableHead>Package</TableHead>
-                      <TableHead className="text-right">CVSS</TableHead>
-                      <TableHead className="text-right">EPSS</TableHead>
-                      <TableHead className="text-center">KEV</TableHead>
-                      <TableHead>Fixed in</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {findings.map((f) => (
-                      <TableRow key={`${f.cve}-${f.asset_id}-${f.pkg}`}>
-                        <TableCell>
-                          <span className={cn('font-semibold', scoreColor(f.priority_score).replace('bg-', 'text-'))}>
-                            {f.priority_score.toFixed(1)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={cn(
-                              'justify-center',
-                              PRIORITY_STYLES[f.priority] ?? PRIORITY_STYLES['P5-INFORMATIONAL'],
-                            )}
-                          >
-                            {f.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{f.cve}</TableCell>
-                        <TableCell>{f.asset_name}</TableCell>
-                        <TableCell className="text-xs">
-                          {f.pkg}
-                          <span className="text-muted-foreground"> ({f.installed})</span>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {f.cvss?.toFixed(1) ?? '—'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {f.epss ? `${(f.epss * 100).toFixed(1)}%` : '—'}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {f.kev ? (
-                            <Badge variant="destructive">KEV</Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {f.fixed ?? <span className="text-red-500">no fix available</span>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="space-y-2">
+                {tickets.slice(0, 6).map((t) => (
+                  <a
+                    key={t.number}
+                    href={t.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block rounded border px-3 py-2 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-900"
+                  >
+                    <span className="mr-2 font-mono text-neutral-400">#{t.number}</span>
+                    {t.title}
+                  </a>
+                ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Assets + scan history */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Asset inventory</CardTitle>
-              <CardDescription>Isolated lab assets and importance</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Criticality</TableHead>
-                    <TableHead className="text-right">Importance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {inventory.map((a) => (
-                    <TableRow key={a.asset_id}>
-                      <TableCell className="font-medium">{a.name}</TableCell>
-                      <TableCell className="font-mono text-xs">{a.image}</TableCell>
-                      <TableCell>{a.criticality}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {a.importance}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Scan history</CardTitle>
-              <CardDescription>Latest Trivy reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {history.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No scans yet.
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Asset</TableHead>
-                      <TableHead className="text-right">Findings</TableHead>
-                      <TableHead className="text-right">Scanned at</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {history.map((h) => (
-                      <TableRow key={h.asset_id}>
-                        <TableCell className="font-medium">{h.asset_id}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {h.findings}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {h.scanned_at}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
+          <Card title="Asset inventory" subtitle="Isolated lab assets">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b text-left text-neutral-500">
+                  <th className="py-2 font-medium">Asset</th>
+                  <th className="py-2 font-medium">Image</th>
+                  <th className="py-2 text-right font-medium">Importance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventory.map((a) => (
+                  <tr key={a.asset_id} className="border-b last:border-0">
+                    <td className="py-2 font-medium">{a.name}</td>
+                    <td className="py-2 font-mono text-neutral-500">{a.image}</td>
+                    <td className="py-2 text-right font-semibold tabular-nums">{a.importance}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <Card title="Scan history" subtitle="Latest Trivy reports">
+            {history.length === 0 ? (
+              <p className="py-6 text-center text-xs text-neutral-400">No scans yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {history.map((h) => (
+                  <div key={h.asset_id} className="flex items-center justify-between border-b pb-2 text-xs last:border-0">
+                    <span className="font-medium">{h.asset_id}</span>
+                    <span className="text-neutral-500">
+                      {h.findings} findings · {h.scanned_at}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>
