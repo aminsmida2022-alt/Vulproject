@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Services\VulnDataService;
+use App\Services\VulnScanService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Process;
 use Inertia\Inertia;
 
 class VulnDashboardController extends Controller
 {
-    public function __construct(private VulnDataService $data)
-    {
+    public function __construct(
+        private VulnDataService $data,
+        private VulnScanService $scanService,
+    ) {
     }
 
     public function index()
@@ -20,37 +22,28 @@ class VulnDashboardController extends Controller
             'findings' => $this->data->findings(),
             'inventory' => $this->data->inventory(),
             'history' => $this->data->scanHistory(),
+            'scanStatus' => $this->scanService->status(),
         ]);
     }
 
     /**
-     * Runs a full scan + enrichment synchronously (offline Trivy DB makes
-     * this fast enough for the local lab).
+     * Starts the scan immediately (detached) and redirects back;
+     * the page polls GET /scan/status for live progress.
      */
     public function scan(Request $request)
     {
-        $root = config('vulnmgmt.project_path');
+        $result = $this->scanService->start();
 
-        $scan = Process::timeout(600)->run(
-            'cd '.escapeshellarg($root).' && bash '.config('vulnmgmt.scan_script')
-        );
-
-        if ($scan->failed()) {
-            return back()->withErrors([
-                'scan' => 'Trivy scan failed: '.mb_substr($scan->errorOutput(), -400),
-            ]);
+        if (! $result['started']) {
+            return back()->with('warning', $result['reason']);
         }
 
-        $enrich = Process::timeout(300)->run(
-            'cd '.escapeshellarg($root).' && '.config('vulnmgmt.enrich_script')
-        );
+        return back()->with('success', 'Scan started.');
+    }
 
-        if ($enrich->failed()) {
-            return back()->withErrors([
-                'scan' => 'Enrichment failed: '.mb_substr($enrich->errorOutput(), -400),
-            ]);
-        }
-
-        return back()->with('success', 'Scan and enrichment completed.');
+    /** Live scan status for polling. */
+    public function scanStatus()
+    {
+        return response()->json($this->scanService->status());
     }
 }

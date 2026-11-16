@@ -1,4 +1,5 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import { scan } from '@/routes/vuln';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,21 @@ type History = {
   scanned_at: string;
 };
 
+type AssetProgress = {
+  asset_id: string;
+  name: string;
+  image: string;
+  state: 'pending' | 'scanned' | 'done';
+};
+
+type ScanStatus = {
+  state: 'idle' | 'running' | 'done' | 'failed';
+  started_at?: string | null;
+  progress?: AssetProgress[];
+  log?: string[];
+  errors?: string[];
+};
+
 type Stats = {
   total: number;
   kev: number;
@@ -67,6 +83,7 @@ type Props = {
   findings: Finding[];
   inventory: Asset[];
   history: History[];
+  scanStatus: ScanStatus;
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -85,14 +102,70 @@ function scoreColor(score: number) {
   return 'bg-neutral-400';
 }
 
-export default function VulnOverview({ stats, findings, inventory, history }: Props) {
+export default function VulnOverview({ stats, findings, inventory, history, scanStatus }: Props) {
   const scanForm = useForm({});
+  const [status, setStatus] = useState<ScanStatus>(scanStatus);
+  const [polling, setPolling] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // keep local status in sync when the server sends a fresh one
+  useEffect(() => {
+    if (scanStatus.state !== 'idle') {
+      setStatus(scanStatus);
+    }
+  }, [scanStatus]);
+
+  // start polling right after a page load with a scan already running
+  useEffect(() => {
+    if (scanStatus.state === 'running' && !polling) {
+      startPolling();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setPolling(false);
+  };
+
+  const startPolling = () => {
+    setPolling(true);
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/scan/status');
+        const data: ScanStatus = await res.json();
+        setStatus(data);
+
+        if (data.state === 'done' || data.state === 'failed') {
+          stopPolling();
+          router.reload({ only: ['stats', 'findings', 'inventory', 'history'] });
+        }
+      } catch {
+        // keep polling; transient network errors are ignored
+      }
+    }, 1500);
+  };
 
   const runScan = () => {
     scanForm.post(scan(), {
       preserveScroll: true,
-      onSuccess: () => scanForm.reset(),
+      onSuccess: () => {
+        scanForm.reset();
+        startPolling();
+      },
     });
+  };
+
+  const running = polling && status.state === 'running';
+  const justFinished = status.state === 'done' || status.state === 'failed';
+
+  const progressIcon = (state: AssetProgress['state']) => {
+    if (state === 'done') return '✅';
+    if (state === 'scanned') return '🔍';
+    return '⏳';
   };
 
   return (
@@ -109,11 +182,16 @@ export default function VulnOverview({ stats, findings, inventory, history }: Pr
               0.25·KEV + 0.20·Asset
             </p>
           </div>
-          <Button onClick={runScan} disabled={scanForm.processing}>
-            {scanForm.processing ? (
+          <Button onClick={runScan} disabled={scanForm.processing || running}>
+            {running ? (
               <>
                 <Spinner className="size-4" />
-                Scanning...
+                Scan running...
+              </>
+            ) : scanForm.processing ? (
+              <>
+                <Spinner className="size-4" />
+                Starting...
               </>
             ) : (
               'Start Scan'
@@ -125,6 +203,62 @@ export default function VulnOverview({ stats, findings, inventory, history }: Pr
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
             {scanForm.errors.scan}
           </div>
+        )}
+
+        {/* Live scan progress */}
+        {status.state !== 'idle' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {running && <Spinner className="size-4" />}
+                {running
+                  ? 'Scan in progress'
+                  : status.state === 'done'
+                    ? 'Last scan completed'
+                    : status.state === 'failed'
+                      ? 'Last scan failed'
+                      : 'Scan status'}
+              </CardTitle>
+              <CardDescription>
+                {status.started_at ? `started ${status.started_at}` : ''}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(status.progress ?? []).map((p) => (
+                  <div
+                    key={p.asset_id}
+                    className={cn(
+                      'rounded-md border p-3 text-sm',
+                      p.state === 'done' && 'border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950',
+                      p.state === 'scanned' && 'border-sky-300 bg-sky-50 dark:border-sky-900 dark:bg-sky-950',
+                      p.state === 'pending' && 'opacity-70',
+                    )}
+                  >
+                    <div className="flex items-center gap-2 font-medium">
+                      <span>{progressIcon(p.state)}</span>
+                      {p.name}
+                    </div>
+                    <div className="mt-1 font-mono text-xs text-muted-foreground">
+                      {p.image}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {status.log && status.log.length > 0 && (
+                <pre className="max-h-40 overflow-auto rounded-md bg-neutral-950 p-3 font-mono text-xs leading-relaxed text-neutral-100">
+                  {status.log.join('\n')}
+                </pre>
+              )}
+
+              {status.errors && status.errors.length > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 font-mono text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                  {status.errors.join('\n')}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* KPI cards */}
