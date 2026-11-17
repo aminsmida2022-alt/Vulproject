@@ -20,8 +20,7 @@ class AgentController extends Controller
         private RawReportService $reports,
         private VulnScanService $scan,
         private GiteaTicketService $tickets,
-    ) {
-    }
+    ) {}
 
     private function authorize(Request $request): void
     {
@@ -140,5 +139,55 @@ class AgentController extends Controller
         $this->authorize($request);
 
         return response()->json($this->tickets->openIssues());
+    }
+
+    /**
+     * POST /api/agent/verifications — n8n records a proof-scan result so the
+     * dashboard evidence panel and the audit trail include n8n verifications.
+     * Body: {ticket, cve, asset, still_present, scanned_at, total_findings_in_scan}
+     */
+    public function storeVerification(Request $request)
+    {
+        $this->authorize($request);
+
+        $v = $request->validate([
+            'ticket' => ['required', 'integer', 'min:1'],
+            'cve' => ['required', 'string', 'regex:/^CVE-\d{4}-\d+$/'],
+            'asset' => ['required', 'string', 'max:100'],
+            'still_present' => ['required', 'boolean'],
+            'scanned_at' => ['nullable', 'string', 'max:40'],
+            'total_findings_in_scan' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $asset = collect($this->data->inventory())->firstWhere('name', $v['asset']) ?? [];
+        $root = config('vulnmgmt.project_path');
+        $now = now()->utc();
+        $evidenceFile = sprintf('tickets/evidence/%d-%s.json', $v['ticket'], $now->format('Ymd\THis\Z'));
+
+        $evidence = [
+            'ticket' => $v['ticket'],
+            'cve' => $v['cve'],
+            'asset_id' => $asset['asset_id'] ?? null,
+            'asset_name' => $v['asset'],
+            'image' => $asset['image'] ?? null,
+            'scanned_at' => $v['scanned_at'] ?? null,
+            'scanner' => 'trivy (n8n proof scan)',
+            'total_findings' => $v['total_findings_in_scan'] ?? null,
+            'verified_at' => $now->toIso8601String(),
+            'result' => $v['still_present'] ? 'still-present' : 'fixed',
+            'verified_by' => 'n8n Remediation Verification',
+        ];
+
+        if (! is_dir($root.'/tickets/evidence')) {
+            mkdir($root.'/tickets/evidence', 0775, true);
+        }
+        file_put_contents($root.'/'.$evidenceFile, json_encode($evidence, JSON_PRETTY_PRINT));
+
+        $logLine = collect($evidence)->only(['ticket', 'cve', 'asset_id', 'image', 'result', 'verified_at'])
+            ->put('evidence_file', $evidenceFile)
+            ->all();
+        file_put_contents($root.'/tickets/verification_log.jsonl', json_encode($logLine)."\n", FILE_APPEND | LOCK_EX);
+
+        return response()->json(['recorded' => true, 'evidence_file' => $evidenceFile], 201);
     }
 }

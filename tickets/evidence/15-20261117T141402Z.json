@@ -1,0 +1,13 @@
+{
+    "ticket": 15,
+    "cve": "CVE-2023-4911",
+    "asset_id": "test-server",
+    "asset_name": "Test Server",
+    "image": "python:3.7-slim",
+    "scanned_at": "2026-11-17T14:14:02.325Z",
+    "scanner": "trivy (n8n proof scan)",
+    "total_findings": 1736,
+    "verified_at": "2026-11-17T14:14:02+00:00",
+    "result": "still-present",
+    "verified_by": "n8n Remediation Verification"
+}

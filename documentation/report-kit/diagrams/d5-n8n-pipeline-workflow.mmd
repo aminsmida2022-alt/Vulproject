@@ -1,0 +1,61 @@
+flowchart TD
+    n0(["Run manually"]):::trig
+    n1(["Daily Schedule<br/><small>cron 0 3 * * *</small>"]):::trig
+    n2(["Manual Scan Request<br/><small>POST /webhook/scan-request</small>"]):::trig
+    n3["Start Trivy Scan<br/><small>POST · Laravel agent API</small>"]:::http
+    n4["Wait 45s<br/><small>pause</small>"]:::wait
+    n5["Poll Scan Status<br/><small>GET · Laravel agent API</small>"]:::http
+    n6{"Still running?"}:::cond
+    n7["Fetch Raw Findings<br/><small>GET · Laravel agent API</small>"]:::http
+    n8["Dedupe Findings"]:::code
+    n9["Build EPSS Batches"]:::code
+    n10["Fetch EPSS Scores<br/><small>GET · FIRST EPSS API</small>"]:::http
+    n11["Merge EPSS"]:::code
+    n12["Fetch CISA KEV<br/><small>GET · Laravel agent API</small>"]:::http
+    n13["Fetch Asset Inventory<br/><small>GET · Laravel agent API</small>"]:::http
+    n14["Fetch Accepted Risks<br/><small>GET · Laravel agent API</small>"]:::http
+    n15["Compute Priority"]:::code
+    n16["Publish Findings to Dashboard<br/><small>POST · Laravel agent API</small>"]:::http
+    n17["Select P1/P2 Findings"]:::code
+    n18["Load Gitea Labels<br/><small>GET · Gitea API</small>"]:::http
+    n19["Load Existing Tickets"]:::code
+    n20["Triage: create / reopen / skip"]:::code
+    n21{"Route by Action"}:::cond
+    n22["Create Gitea Ticket<br/><small>POST · Gitea API</small>"]:::http
+    n23["Reopen Ticket (regression)<br/><small>PATCH · Gitea API</small>"]:::http
+    n24["Set Regression Labels<br/><small>PUT · Gitea API</small>"]:::http
+    n25["Comment Regression<br/><small>POST · Gitea API</small>"]:::http
+    n26(["Already handled (skip)"]):::skip
+    n1 --> n3
+    n2 --> n3
+    n3 --> n4
+    n4 --> n5
+    n5 --> n6
+    n6 -->|yes| n4
+    n6 -->|no| n7
+    n7 --> n8
+    n8 --> n9
+    n9 --> n10
+    n10 --> n11
+    n11 --> n12
+    n12 --> n13
+    n13 --> n14
+    n14 --> n15
+    n15 --> n16
+    n16 --> n17
+    n17 --> n18
+    n18 --> n19
+    n19 --> n20
+    n20 --> n21
+    n21 -->|output 1| n22
+    n21 -->|output 2| n23
+    n21 -->|output 3| n26
+    n23 --> n24
+    n24 --> n25
+    n0 --> n3
+    classDef trig fill:#e8f0fb,stroke:#2a78d6,color:#0b0b0b
+    classDef http fill:#ffffff,stroke:#52514e,color:#0b0b0b
+    classDef code fill:#fdeee7,stroke:#eb6834,color:#0b0b0b
+    classDef cond fill:#fff7e0,stroke:#c98500,color:#0b0b0b
+    classDef wait fill:#f1f1ef,stroke:#8a8984,color:#0b0b0b
+    classDef skip fill:#f1f1ef,stroke:#8a8984,color:#52514e

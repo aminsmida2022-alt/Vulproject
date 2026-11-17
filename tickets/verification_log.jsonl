@@ -8,3 +8,4 @@
 {"ticket": 12, "cve": "CVE-2024-2961", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/12-20261116T201612Z.json"}
 {"ticket": 14, "cve": "CVE-2023-44487", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/14-20261116T201612Z.json"}
 {"ticket": 15, "cve": "CVE-2023-4911", "asset_id": "test-server", "image": "python:3.7-slim", "result": "still-present", "verified_at": "2026-11-16T20:40:35+00:00", "evidence_file": "tickets/evidence/15-20261116T204035Z.json"}
+{"ticket":15,"cve":"CVE-2023-4911","asset_id":"test-server","image":"python:3.7-slim","verified_at":"2026-11-17T14:14:02+00:00","result":"still-present","evidence_file":"tickets\/evidence\/15-20261117T141402Z.json"}

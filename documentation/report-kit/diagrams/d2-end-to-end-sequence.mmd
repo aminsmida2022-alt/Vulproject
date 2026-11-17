@@ -2,29 +2,29 @@ sequenceDiagram
     autonumber
     actor Analyst
     participant D as Dashboard
+    participant N as n8n (W1 pipeline)
     participant T as Trivy
-    participant E as enrich.py
-    participant N as n8n
     participant G as Gitea
-    participant V as verify.py
 
-    Analyst->>D: Start Scan (or 02:00 schedule)
-    D->>T: scan_all.sh (each asset in inventory)
-    T-->>D: reports/<asset>.json
-    D->>E: enrich.py
-    E->>E: dedupe, EPSS + KEV lookup, P = 0.25C+0.30E+0.25K+0.20A
-    E-->>D: findings.json (ranked)
-    D->>N: POST findings to webhook
-    N->>G: list existing issues (dedupe key = CVE + asset)
-    N->>G: create P1/P2 issues (labels, SLA due date)
-    Note over N,G: daily: reminder at 75% SLA, escalation when overdue
+    Analyst->>D: Start Scan (or 03:00 schedule)
+    D->>N: POST /webhook/scan-request
+    N->>T: agent API scan/start
+    loop until Trivy exits
+        N->>T: agent API scan/status
+    end
+    N->>T: agent API reports/raw
+    N->>N: dedupe + EPSS + KEV + assets + exceptions
+    N->>N: P = 0.25C + 0.30E + 0.25K + 0.20A
+    N-->>D: agent API findings (findings.json, cycle closed)
+    N->>G: search open issue (key = CVE + asset)
+    N->>G: create P1/P2 tickets (priority table, acceptance criteria)
+    Note over N,G: daily W2: reminder at 75% of the SLA (P1 7 d / P2 30 d), escalation when overdue
     Analyst->>Analyst: patch the asset (upgrade image / package)
     Analyst->>D: Verify ticket
-    D->>V: verify.py --ticket N
-    V->>T: rescan the asset
-    alt CVE gone
-        V->>G: evidence comment + verified-fixed + close
+    D->>N: POST /webhook/verify-request {ticket}  (W3)
+    N->>T: proof scan (raw mode) + poll
+    alt CVE gone from fresh reports
+        N->>G: evidence comment + close + verified-fixed
     else CVE still present
-        V->>G: evidence comment + verification-failed (stays open)
+        N->>G: evidence comment + verification-failed (stays open)
     end
-    Note over N,G: next scan: CVE back on a closed ticket -> reopen + regression

@@ -1,0 +1,47 @@
+flowchart TD
+    n0(["Run manually"]):::trig
+    n1["Ticket to verify"]:::code
+    n2(["Verification Request<br/><small>POST /webhook/verify-request</small>"]):::trig
+    n3["Get Ticket<br/><small>GET · Gitea API</small>"]:::http
+    n4["Parse CVE + Asset"]:::code
+    n5{"Parseable?"}:::cond
+    n6["Launch Proof Scan<br/><small>POST · Laravel agent API</small>"]:::http
+    n7["Wait 45s<br/><small>pause</small>"]:::wait
+    n8["Poll Scan Status<br/><small>GET · Laravel agent API</small>"]:::http
+    n9{"Still scanning?"}:::cond
+    n10["Fetch Fresh Reports<br/><small>GET · Laravel agent API</small>"]:::http
+    n11["Compare Evidence"]:::code
+    n12{"Finding still present?"}:::cond
+    n13["Close Ticket (verified)<br/><small>PATCH · Gitea API</small>"]:::http
+    n14["Comment Close Evidence<br/><small>POST · Gitea API</small>"]:::http
+    n15["Reopen Ticket (not fixed)<br/><small>PATCH · Gitea API</small>"]:::http
+    n16["Comment Reopen Evidence<br/><small>POST · Gitea API</small>"]:::http
+    n17["Label verified-fixed<br/><small>POST · Gitea API</small>"]:::http
+    n18["Label verification-failed<br/><small>POST · Gitea API</small>"]:::http
+    n19["Record Evidence in Dashboard<br/><small>POST · Laravel agent API</small>"]:::http
+    n2 --> n3
+    n3 --> n4
+    n4 --> n5
+    n5 -->|yes| n6
+    n6 --> n7
+    n7 --> n8
+    n8 --> n9
+    n9 -->|yes| n7
+    n9 -->|no| n10
+    n10 --> n11
+    n11 --> n12
+    n11 --> n19
+    n12 -->|yes| n15
+    n12 -->|no| n13
+    n13 --> n14
+    n15 --> n16
+    n0 --> n1
+    n1 --> n3
+    n14 --> n17
+    n16 --> n18
+    classDef trig fill:#e8f0fb,stroke:#2a78d6,color:#0b0b0b
+    classDef http fill:#ffffff,stroke:#52514e,color:#0b0b0b
+    classDef code fill:#fdeee7,stroke:#eb6834,color:#0b0b0b
+    classDef cond fill:#fff7e0,stroke:#c98500,color:#0b0b0b
+    classDef wait fill:#f1f1ef,stroke:#8a8984,color:#0b0b0b
+    classDef skip fill:#f1f1ef,stroke:#8a8984,color:#52514e

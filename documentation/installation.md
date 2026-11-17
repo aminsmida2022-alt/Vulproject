@@ -33,35 +33,49 @@ another application. Container-side it is still 3000 (n8n calls `http://gitea:30
 
 1. In Gitea, log in as `vulnadmin`, create the repository `remediation-tickets`.
 2. *Settings -> Applications* -> generate an API token (scopes: issue + repository read/write).
-3. Put the token in `docker-compose.yml` (`N8N_GITEA_TOKEN`) and in `dashboard/.env`
-   (`VULNMGMT_GITEA_TOKEN`), then `docker compose up -d n8n`.
+3. Put the secrets in the git-ignored env files, then `docker compose up -d n8n`:
+
+   | File | Variables |
+   |---|---|
+   | `.env` (repo root, read by docker compose) | `N8N_GITEA_TOKEN=<gitea token>`, `N8N_AGENT_TOKEN=<agent key>` |
+   | `dashboard/.env` | `VULNMGMT_GITEA_TOKEN=<gitea token>`, `VULNMGMT_AGENT_TOKEN=<same agent key>` |
+
+   Generate the agent key with `openssl rand -hex 20`. Templates: `.env.example`, `dashboard/.env.example`.
 4. Create the workflow labels:
 
    ```bash
    GITEA_TOKEN=<token> scripts/setup_gitea_labels.sh
    ```
 
-5. Import and activate the n8n workflows (the JSON files in `n8n/workflows/`
-   are the source of truth; import creates a new id each time, so purge the
-   old rows first if you re-import):
+5. Import and publish the n8n workflows (`n8n/workflows/*.json` are the source of
+   truth; each file carries a fixed id, so re-importing updates the same workflow):
 
    ```bash
-   docker exec vulnmgmt-n8n n8n import:workflow --input=/home/node/import-workflows/vuln-pipeline.json
-   docker exec vulnmgmt-n8n n8n import:workflow --input=/home/node/import-workflows/sla-reminders.json
-   docker exec vulnmgmt-n8n n8n import:workflow --input=/home/node/import-workflows/remediation-verification.json
-   # then in the n8n UI: activate each workflow (or n8n update:workflow --id=<id> --active=true)
+   docker exec vulnmgmt-n8n n8n import:workflow --separate --input=/home/node/import-workflows
+   for id in EeJXVveoDzwgC5nz JB4oPfWQOM9fqDQK JSu7lmqR4NBEr63F; do
+     docker exec vulnmgmt-n8n n8n publish:workflow --id=$id
+   done
+   docker restart vulnmgmt-n8n
    ```
+
+   The workflows read both secrets from the container environment
+   (`$env.N8N_GITEA_TOKEN`, `$env.N8N_AGENT_TOKEN`); no secret is stored in the JSON.
+
+   **Running a workflow from the n8n editor:** each workflow has several triggers.
+   Use the arrow next to *Execute workflow* and pick **Run manually** (otherwise the
+   editor waits for a webhook call and seems stuck). The manual path of
+   *Remediation Verification* verifies the ticket set in its *Ticket to verify* node.
 
 | Workflow | Trigger | Job |
 |---|---|---|
 | **Vulnerability Pipeline (A to Z)** | daily 03:00 + `POST /webhook/scan-request` | starts the Trivy scan through the agent API, polls, dedupes, enriches (EPSS + KEV + assets + accepted risks), computes the priority, publishes `findings.json`, creates P1/P2 Gitea tickets with dedupe |
-| **SLA Reminder and Escalation** | daily 09:00 + `POST /webhook/sla-check` | P1-CRITICAL due in 48 h, P2-HIGH in 7 days: first breach -> `sla-reminder` label + comment, second pass -> `sla-escalated` + escalation comment |
-| **Remediation Verification** | `POST /webhook/verify-request` `{ticket}` | proof scan (raw mode), closes the ticket with evidence if the CVE is gone, reopens it with evidence otherwise |
+| **SLA Reminder and Escalation** | daily 09:00 + `POST /webhook/sla-check` | SLA P1-CRITICAL 7 days, P2-HIGH 30 days: at 75% -> `sla-warning` + reminder comment; overdue -> `sla-breached` + `escalated` + escalation comment |
+| **Remediation Verification** | `POST /webhook/verify-request` `{ticket}` | proof scan (raw mode), closes the ticket with evidence + `verified-fixed` if the CVE is gone, keeps it open with evidence + `verification-failed` otherwise; records the result in `tickets/` for the dashboard |
 
 ## 3b. Agent API (Laravel <-> n8n)
 
 The n8n workflows drive the scan and data layer through a token-protected API
-(header `X-Agent-Token`, configured as `VULNMGMT_AGENT_TOKEN` in `dashboard/.env`):
+(header `X-Agent-Token`, `VULNMGMT_AGENT_TOKEN` in `dashboard/.env` = `N8N_AGENT_TOKEN` in `.env`):
 
 | Endpoint | Method | Purpose |
 |---|---|---|
@@ -72,6 +86,7 @@ The n8n workflows drive the scan and data layer through a token-protected API
 | `/api/agent/kev` | GET | CISA KEV CVE set (cached, weekly refresh) |
 | `/api/agent/exceptions` | GET / POST | accepted-risk exceptions (read / add) |
 | `/api/agent/findings` | POST | n8n publishes the final ranked dataset (closes the cycle) |
+| `/api/agent/verifications` | POST | n8n records a proof-scan result (evidence file + audit log) |
 | `/api/agent/open-tickets` | GET | current open Gitea tickets |
 
 Set `VULNMGMT_ORCHESTRATOR=n8n` (default) in `dashboard/.env`. The dashboard
@@ -175,10 +190,10 @@ P4-LOW >= 20 · P5-INFORMATIONAL < 20. Tickets are created for P1 and P2.
 scanner/scan_all.sh          batch Trivy scan of the asset inventory (offline DB)
 scanner/extract_db.sh        extract the Trivy DB from the OCI image
 scripts/enrich.py            dedupe + EPSS + KEV + priority score
-scripts/verify.py            Phase 8 rescan + close/keep-open with evidence
+scripts/verify.py            local fallback of the verification (n8n is the default)
 scripts/evaluate.py          Phase 9 CVSS-only vs contextual evaluation
 scripts/setup_gitea_labels.sh  Gitea workflow labels
-n8n/build_workflows.py       generates n8n/workflows/*.json
+n8n/workflows/               the 3 n8n workflows (pipeline, SLA, verification)
 dashboard/                   Laravel 12 + Inertia (React) dashboard
 data/assets/inventory.json   assets + importance
 data/vulnerabilities/        findings.json, kev_cache.json, evaluation.json

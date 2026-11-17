@@ -14,12 +14,23 @@ Automated vulnerability management system that identifies, prioritizes, tracks a
 
 ## Pipeline
 
-1. **Scan** - `scanner/scan_all.sh` scans every asset of `data/assets/inventory.json` with Trivy.
-2. **Enrich + prioritize** - `scripts/enrich.py` dedupes, adds EPSS + KEV, computes P.
-3. **Ticket** - n8n creates Gitea tickets for P1/P2 with SLA due dates (dedupe, regression reopen, risk acceptance).
-4. **SLA** - n8n reminds at 75% of the SLA and escalates overdue tickets.
-5. **Verify** - `scripts/verify.py` rescans; closes the ticket only if the CVE is gone, with evidence.
-6. **Evaluate** - `scripts/evaluate.py` compares contextual priority with CVSS-only.
+One n8n workflow, **Vulnerability Pipeline (A to Z)** (`n8n/workflows/vuln-pipeline.json`),
+runs the whole cycle from scan to ticket (daily 03:00, or `POST /webhook/scan-request`):
+
+1. **Scan** - start the Trivy scan of every asset in `data/assets/inventory.json`, poll until done.
+2. **Dedupe** - one finding per CVE + asset.
+3. **Enrich** - EPSS (FIRST API), CISA KEV, asset importance, approved risk exceptions.
+4. **Prioritize** - compute P, publish the findings to the dashboard.
+5. **Ticket** - for P1/P2: create a Gitea ticket (labels + SLA due date), reopen a closed ticket as
+   `regression` if the CVE is back, skip if already open or `risk-accepted`.
+
+Then:
+
+- **SLA** - n8n *SLA Reminder and Escalation* reminds and escalates overdue tickets.
+- **Verify** - n8n *Remediation Verification* rescans; closes the ticket only if the CVE is gone, with evidence.
+- **Evaluate** - `scripts/evaluate.py` compares contextual priority with CVSS-only.
+
+`scanner/scan_all.sh` + `scripts/enrich.py` remain as the local fallback used by the dashboard when n8n is down.
 
 ## Documentation
 

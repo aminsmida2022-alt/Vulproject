@@ -12,11 +12,13 @@ Do not change the numbers or make up new ones.
 
 | Folder | File | What it shows | Use it in |
 |---|---|---|---|
-| `diagrams/` | `d1-architecture` | The 5 stages: Scan → Enrich + prioritize → Orchestrate (n8n) → Track (Gitea) → Verify | Report ch. 3 · Slide 5 |
+| `diagrams/` | `d1-architecture` | Components: dashboard, n8n (3 workflows), Laravel agent API, Trivy, Gitea, EPSS/KEV | Report ch. 3 · Slide 5 |
 | | `d2-end-to-end-sequence` | Sequence from "Start Scan" to the proven fix | Report ch. 3 · Slide 6 |
 | | `d3-ticket-lifecycle` | Ticket states: open, escalated, closed, accepted, regression | Report ch. 4 · Slide 9 |
 | | `d4-priority-model` | P = 0.25·CVSS + 0.30·EPSS + 0.25·KEV + 0.20·Asset → P1/P2/P3–P5 | Report ch. 4 · Slide 7 |
-| | `d5-n8n-triage-logic` | n8n decision logic: filter, dedupe, reopen, skip, create | Report ch. 4 · Slide 8 |
+| | `d5-n8n-pipeline-workflow` | n8n workflow 1 "Vulnerability Pipeline (A to Z)", all 27 nodes: scan → dedupe → EPSS/KEV/assets → priority → tickets | Report ch. 4 · Slide 8 |
+| | `d7-n8n-sla-workflow` | n8n workflow 2 "SLA Reminder and Escalation" (7 nodes) | Report ch. 4 · Slide 9 |
+| | `d8-n8n-verification-workflow` | n8n workflow 3 "Remediation Verification" (20 nodes) | Report ch. 4 · Slide 10 |
 | | `d6-verification-logic` | Rescan → close with evidence or keep open | Report ch. 4 · Slide 10 |
 | `charts/` | `e1-workload` | 413 findings to fix (CVSS-only) vs 15 (contextual) | Report ch. 5 · Slide 12 |
 | | `e2-equal-budget` | Same budget of 15 fixes: KEV caught 1/4 vs 4/4 | Report ch. 5 · Slide 13 |
@@ -46,7 +48,8 @@ Diagrams come in 3 formats: `.png` (ready to use), `.svg` (sharp at any size), a
 - Python scripts: enrichment, scoring, verification, evaluation
 - FIRST EPSS API: probability of exploitation in the next 30 days
 - CISA KEV catalogue: CVEs known to be exploited in the wild
-- n8n: SOAR / workflow automation (2 workflows)
+- n8n: SOAR orchestrator, runs the whole pipeline (3 workflows)
+- Laravel agent API (`/api/agent/*`, token-protected): lets n8n start scans and read/write data
 - Gitea + PostgreSQL: ticket management
 - Laravel 12 + Inertia/React: dashboard
 
@@ -63,9 +66,9 @@ C = CVSS ×10 · E = EPSS ×100 · K = 100 if in KEV · A = asset importance (al
 P1 ≥ 80 (SLA 7 days) · P2 ≥ 60 (SLA 30 days) · P3–P5: no ticket, dashboard only.
 
 **Automation:**
-- After each scan, n8n keeps P1/P2, removes duplicates (key = CVE + asset), creates Gitea tickets with priority/KEV labels and an SLA due date, reopens a closed ticket if the CVE comes back (`regression`), and skips tickets marked `risk-accepted`.
-- Every day at 08:00, n8n posts a reminder at 75% of the SLA and escalates overdue tickets (`sla-breached` + `escalated`).
-- Verification: the analyst clicks *Verify* → the asset is rescanned → CVE gone = ticket closed with an evidence comment (image ID, scan time, DB version, report SHA-256) and the `verified-fixed` label; CVE present = ticket stays open with `verification-failed`.
+- **Workflow 1, Vulnerability Pipeline (A to Z)** (daily 03:00 or *Start Scan* in the dashboard): n8n starts the Trivy scan through the agent API, waits for it, removes duplicates, fetches EPSS, KEV, asset importance and accepted risks, computes P, sends the ranked findings back to the dashboard, then keeps P1/P2, removes duplicates (key = CVE + asset), creates Gitea tickets with priority/KEV labels and an SLA due date, reopens a closed ticket if the CVE comes back (`regression`), and skips tickets marked `risk-accepted`.
+- **Workflow 2, SLA Reminder and Escalation** (daily 09:00): reminder at 75% of the SLA (`sla-warning`), escalation when overdue (`sla-breached` + `escalated`); `risk-accepted` tickets are ignored.
+- **Workflow 3, Remediation Verification** (*Verify* button in the dashboard): the analyst clicks *Verify* → the asset is rescanned → CVE gone = ticket closed with an evidence comment (image ID, scan time, DB version, report SHA-256) and the `verified-fixed` label; CVE present = ticket stays open with `verification-failed`.
 - A full scan runs automatically every day at 02:00.
 
 **Key results:**
@@ -126,10 +129,10 @@ Structure:
 4. Implementation, one section per phase:
    4.1 Lab and scanning (Trivy, offline DB, 3 assets)
    4.2 Enrichment and priority model (formula, weights, thresholds) - figures d4, 05-finding-drilldown
-   4.3 SOAR workflows in n8n (triage, dedupe, regression, risk acceptance, SLA, escalation)
-       - figures d5, n8n screenshots 10-11
+   4.3 SOAR orchestration in n8n: the 3 workflows (pipeline A to Z, SLA, verification) and the
+       Laravel agent API they call - figures d5, d7, d8, n8n screenshots 10-12
    4.4 Ticket management in Gitea (labels, SLA due dates) - figures d3, 07-remediation-tickets, 12
-   4.5 Remediation verification with evidence - figures d6, 08-verification-evidence, 13
+   4.5 Remediation verification with evidence (n8n workflow 3) - figures d6, d8, 08-verification-evidence, 13
    4.6 Dashboard - figure 02-dashboard-overview
 5. Tests and evaluation:
    5.1 The 6 scenarios: one table (scenario, steps, expected, observed, result)
@@ -164,8 +167,8 @@ Use ONLY the facts and numbers provided. Do not invent results.
 5. Architecture: figure d1-architecture
 6. End-to-end flow: figure d2-end-to-end-sequence
 7. Priority model: formula + figure d4 + 05-finding-drilldown (99.5 = 24.5+30+25+20)
-8. SOAR automation in n8n: figure d5 + screenshot 10-n8n-triage-workflow
-9. Tickets with SLA: screenshot 07-remediation-tickets + figure d3
+8. n8n runs everything (A to Z): screenshot 10-n8n-pipeline-workflow (or figure d5)
+9. Tickets with SLA: screenshot 07-remediation-tickets + figure d3 (+ d7 for the SLA workflow)
 10. Proof of remediation: figure d6 + screenshot 13-gitea-evidence-comment
 11. Dashboard: screenshot 02-dashboard-overview
 12. Result 1: workload 413 → 15 (−96.4%), figure e1-workload
@@ -174,7 +177,7 @@ Use ONLY the facts and numbers provided. Do not invent results.
 15. Limits & future work, then "Questions?"
 
 Optional live demo plan (3 min, put it after slide 11):
-Start Scan → n8n Executions tab → new tickets in Gitea → Verify on a ticket → evidence comment.
+Start Scan in the dashboard → watch the n8n *Executions* tab → tickets in Gitea → *Verify* on a ticket → evidence comment in Gitea + evidence panel in the dashboard.
 ```
 
 ---
@@ -184,11 +187,13 @@ Start Scan → n8n Executions tab → new tickets in Gitea → Verify on a ticke
 Gitea and n8n need a login, so the person who owns the accounts captures these.
 Browser window ~1600 px wide, zoom 100%, light theme. Save them in `screenshots/` with these exact names.
 
+To run a workflow from the n8n editor before capturing: click the arrow next to *Execute workflow* and pick **Run manually**.
+
 | File | Where | What to show |
 |---|---|---|
-| `10-n8n-triage-workflow.png` | http://localhost:5678 → *Vuln Management - Findings to Tickets* | The canvas with the 3 nodes; open the Triage node so the code is visible |
+| `10-n8n-pipeline-workflow.png` | http://localhost:5678 → *Vulnerability Pipeline (A to Z)* | The whole canvas (press `Shift+1` to fit it on screen) |
 | `11-n8n-execution.png` | Same workflow → *Executions* tab → latest successful run | Execution view with green nodes and item counts |
-| `12-n8n-sla-workflow.png` | *Vuln Management - SLA reminders & escalation* | Canvas: Daily 08:00 + webhook → Check SLA |
+| `12-n8n-verification-workflow.png` | *Remediation Verification* | The canvas with the close / keep-open branches |
 | `13-gitea-evidence-comment.png` | Gitea → issue **#14** | The "Verification PASSED" evidence table, then the "Regression detected" comment below it |
 | `14-gitea-issue-list.png` | Gitea → remediation-tickets → Issues | List showing the colored labels and due dates |
 | `15-gitea-escalation.png` | Gitea → issue **#3** | The "SLA breached - escalated" comment and labels |

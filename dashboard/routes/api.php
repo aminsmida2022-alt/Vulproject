@@ -16,4 +16,5 @@ Route::prefix('agent')->group(function () {
     Route::post('exceptions', [AgentController::class, 'addException']);
     Route::post('findings', [AgentController::class, 'storeFindings']);
     Route::get('open-tickets', [AgentController::class, 'openTickets']);
+    Route::post('verifications', [AgentController::class, 'storeVerification']);
 });

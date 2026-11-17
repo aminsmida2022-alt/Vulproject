@@ -25,7 +25,7 @@ flowchart LR
     end
     EPSS["FIRST EPSS API"] --> N8N
     KEV["CISA KEV catalogue"] --> N8N
-    DASH -- "POST /scan" --> N8N
+    DASH -- "Start Scan · Verify (webhooks)" --> N8N
     N8N -- "start / poll / fetch" --> AGENT
     AGENT --> TRIVY
     AGENT <--> INV
@@ -41,8 +41,8 @@ flowchart LR
 | Workflow | Triggers | What it does |
 |---|---|---|
 | **Vulnerability Pipeline (A to Z)** | cron `0 3 * * *` + webhook `POST /webhook/scan-request` | starts Trivy via agent API, polls, dedupes raw findings, fetches EPSS (batched), KEV, inventory and accepted risks, computes `P = 0.25C + 0.30E + 0.25K + 0.20A`, publishes `findings.json` back, opens Gitea tickets for P1/P2 with dedupe |
-| **SLA Reminder and Escalation** | cron `0 9 * * *` + webhook `POST /webhook/sla-check` | P1 due in 48 h, P2 in 7 d: first breach -> comment + `sla-reminder` label, second pass -> escalation comment + `sla-escalated` label |
-| **Remediation Verification** | webhook `POST /webhook/verify-request` `{ticket}` | proof scan (raw mode), compares fresh reports, **closes the ticket with evidence** if the CVE is gone, **reopens it with evidence** if it is still present |
+| **SLA Reminder and Escalation** | cron `0 9 * * *` + webhook `POST /webhook/sla-check` | SLA P1-CRITICAL 7 days, P2-HIGH 30 days (ticket due date): at 75% elapsed -> reminder comment + `sla-warning`; deadline passed -> escalation comment + `sla-breached` + `escalated`. Each stage fires once; `risk-accepted` tickets are ignored |
+| **Remediation Verification** | webhook `POST /webhook/verify-request` `{ticket}` + Run manually | proof scan (raw mode), compares fresh reports, **closes the ticket with evidence** + `verified-fixed` if the CVE is gone, keeps/reopens it with evidence + `verification-failed` otherwise; records the result in the dashboard (`POST /api/agent/verifications` -> `tickets/evidence/`, `tickets/verification_log.jsonl`) |
 
 ## 2. End-to-end flow (scan -> ticket -> fix -> proof)
 
@@ -67,15 +67,15 @@ sequenceDiagram
     N-->>D: agent API findings (findings.json, cycle closed)
     N->>G: search open issue (key = CVE + asset)
     N->>G: create P1/P2 tickets (priority table, acceptance criteria)
-    Note over N,G: daily W2: SLA reminder (48 h P1 / 7 d P2), then escalation
+    Note over N,G: daily W2: reminder at 75% of the SLA (P1 7 d / P2 30 d), escalation when overdue
     Analyst->>Analyst: patch the asset (upgrade image / package)
     Analyst->>D: Verify ticket
     D->>N: POST /webhook/verify-request {ticket}  (W3)
     N->>T: proof scan (raw mode) + poll
     alt CVE gone from fresh reports
-        N->>G: evidence comment + close
+        N->>G: evidence comment + close + verified-fixed
     else CVE still present
-        N->>G: evidence comment + reopen
+        N->>G: evidence comment + verification-failed (stays open)
     end
 ```
 
@@ -85,12 +85,12 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> Open: n8n creates ticket (P >= 60)
-    Open --> Open: SLA breached once -> sla-reminder
-    Open --> Escalated: still breached -> sla-escalated + escalation comment
-    Open --> Closed: verification passed -> evidence comment
-    Open --> Open: verification failed -> evidence comment (stays open)
-    Open --> Accepted: exception approved -> excluded before ticketing
-    Closed --> Open: proof scan finds CVE again -> reopened with evidence
+    Open --> Open: 75% of SLA elapsed -> sla-warning
+    Open --> Escalated: deadline passed -> sla-breached + escalated
+    Open --> Closed: verification passed -> verified-fixed
+    Open --> Open: verification failed -> verification-failed
+    Open --> Accepted: risk-accepted label / approved exception
+    Closed --> Open: next scan finds CVE again -> regression
     Escalated --> Closed: verification passed
     Accepted --> [*]
     Closed --> [*]

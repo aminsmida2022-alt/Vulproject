@@ -1,6 +1,45 @@
 {
+  "id": "JSu7lmqR4NBEr63F",
   "name": "Remediation Verification",
+  "description": null,
+  "active": true,
   "nodes": [
+    {
+      "parameters": {},
+      "id": "d3000000-0000-4000-8000-verifyflow00",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -540,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "body.ticket",
+              "value": 17,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "d3000000-0001-4000-8000-verifyflow01",
+      "name": "Ticket to verify",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -300,
+        -200
+      ]
+    },
     {
       "parameters": {
         "httpMethod": "POST",
@@ -12,7 +51,10 @@
       "name": "Verification Request",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-300, 0],
+      "position": [
+        -300,
+        0
+      ],
       "webhookId": "verify-request"
     },
     {
@@ -21,8 +63,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -31,7 +79,10 @@
       "name": "Get Ticket",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-60, 0]
+      "position": [
+        -60,
+        0
+      ]
     },
     {
       "parameters": {
@@ -41,7 +92,10 @@
       "name": "Parse CVE + Asset",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [180, 0]
+      "position": [
+        180,
+        0
+      ]
     },
     {
       "parameters": {
@@ -56,7 +110,10 @@
             {
               "leftValue": "={{ $json.cve }}",
               "rightValue": "CVE-",
-              "operator": { "type": "string", "operation": "startsWith" }
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
             }
           ],
           "combinator": "and"
@@ -67,7 +124,10 @@
       "name": "Parseable?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [420, 0]
+      "position": [
+        420,
+        0
+      ]
     },
     {
       "parameters": {
@@ -76,9 +136,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -90,7 +159,10 @@
       "name": "Launch Proof Scan",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -103,7 +175,10 @@
       "name": "Wait 45s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [900, 0],
+      "position": [
+        900,
+        0
+      ],
       "webhookId": "verify-wait-1"
     },
     {
@@ -112,8 +187,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -122,7 +203,10 @@
       "name": "Poll Scan Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1140, 0]
+      "position": [
+        1140,
+        0
+      ]
     },
     {
       "parameters": {
@@ -137,7 +221,10 @@
             {
               "leftValue": "={{ $json.state === 'running' }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "true" }
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
             }
           ],
           "combinator": "and"
@@ -148,7 +235,10 @@
       "name": "Still scanning?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1380, 0]
+      "position": [
+        1380,
+        0
+      ]
     },
     {
       "parameters": {
@@ -156,8 +246,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -166,7 +262,10 @@
       "name": "Fetch Fresh Reports",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1640, 0]
+      "position": [
+        1640,
+        0
+      ]
     },
     {
       "parameters": {
@@ -176,7 +275,10 @@
       "name": "Compare Evidence",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1880, 0]
+      "position": [
+        1880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -191,7 +293,10 @@
             {
               "leftValue": "={{ $json.still_present }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "true" }
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
             }
           ],
           "combinator": "and"
@@ -202,7 +307,10 @@
       "name": "Finding still present?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [2120, 0]
+      "position": [
+        2120,
+        0
+      ]
     },
     {
       "parameters": {
@@ -211,9 +319,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -225,7 +342,10 @@
       "name": "Close Ticket (verified)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2380, -100]
+      "position": [
+        2380,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -234,9 +354,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -248,7 +377,10 @@
       "name": "Comment Close Evidence",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2620, -100]
+      "position": [
+        2620,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -257,9 +389,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -271,7 +412,10 @@
       "name": "Reopen Ticket (not fixed)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2380, 160]
+      "position": [
+        2380,
+        160
+      ]
     },
     {
       "parameters": {
@@ -280,9 +424,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -294,63 +447,340 @@
       "name": "Comment Reopen Evidence",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2620, 160]
+      "position": [
+        2620,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $('Compare Evidence').first().json.ticket }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: ['verified-fixed'] }) }}"
+      },
+      "id": "d3000000-0002-4000-8000-verifyflow02",
+      "name": "Label verified-fixed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $('Compare Evidence').first().json.ticket }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: ['verification-failed'] }) }}"
+      },
+      "id": "d3000000-0003-4000-8000-verifyflow03",
+      "name": "Label verification-failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/agent/verifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "record-evidence-dashboard",
+      "name": "Record Evidence in Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        220
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
     "Verification Request": {
-      "main": [[{ "node": "Get Ticket", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get Ticket": {
-      "main": [[{ "node": "Parse CVE + Asset", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse CVE + Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse CVE + Asset": {
-      "main": [[{ "node": "Parseable?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parseable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parseable?": {
       "main": [
-        [{ "node": "Launch Proof Scan", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Launch Proof Scan",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Launch Proof Scan": {
-      "main": [[{ "node": "Wait 45s", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait 45s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait 45s": {
-      "main": [[{ "node": "Poll Scan Status", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Poll Scan Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Poll Scan Status": {
-      "main": [[{ "node": "Still scanning?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Still scanning?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Still scanning?": {
       "main": [
-        [{ "node": "Wait 45s", "type": "main", "index": 0 }],
-        [{ "node": "Fetch Fresh Reports", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Wait 45s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Fresh Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Fetch Fresh Reports": {
-      "main": [[{ "node": "Compare Evidence", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Compare Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Compare Evidence": {
-      "main": [[{ "node": "Finding still present?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Finding still present?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Record Evidence in Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Finding still present?": {
       "main": [
-        [{ "node": "Reopen Ticket (not fixed)", "type": "main", "index": 0 }],
-        [{ "node": "Close Ticket (verified)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Reopen Ticket (not fixed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Close Ticket (verified)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Close Ticket (verified)": {
-      "main": [[{ "node": "Comment Close Evidence", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Comment Close Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Reopen Ticket (not fixed)": {
-      "main": [[{ "node": "Comment Reopen Evidence", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Comment Reopen Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Ticket to verify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket to verify": {
+      "main": [
+        [
+          {
+            "node": "Get Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Close Evidence": {
+      "main": [
+        [
+          {
+            "node": "Label verified-fixed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Reopen Evidence": {
+      "main": [
+        [
+          {
+            "node": "Label verification-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
-  "settings": { "executionOrder": "v1" },
-  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
   "meta": {
     "description": "Phase 8: proof scan requested per ticket -> compare fresh Trivy reports -> close with evidence if the CVE is gone, reopen if it is still present."
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": null,
+    "description": null
   }
 }

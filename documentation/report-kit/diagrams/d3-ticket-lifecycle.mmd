@@ -1,12 +1,11 @@
 stateDiagram-v2
     [*] --> Open: n8n creates ticket (P >= 60)
-    Open --> Open: SLA 75% -> sla-warning
-    Open --> Escalated: due date passed -> sla-breached + escalated
-    Escalated --> Closed: verification passed
-    Open --> Open: verification failed -> verification-failed
+    Open --> Open: 75% of SLA elapsed -> sla-warning
+    Open --> Escalated: deadline passed -> sla-breached + escalated
     Open --> Closed: verification passed -> verified-fixed
-    Open --> Accepted: risk-accepted label + justification
-    Escalated --> Accepted: risk-accepted label + justification
-    Closed --> Open: CVE detected again -> regression
+    Open --> Open: verification failed -> verification-failed
+    Open --> Accepted: risk-accepted label / approved exception
+    Closed --> Open: next scan finds CVE again -> regression
+    Escalated --> Closed: verification passed
     Accepted --> [*]
     Closed --> [*]

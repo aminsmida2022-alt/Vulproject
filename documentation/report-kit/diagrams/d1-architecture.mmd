@@ -1,26 +1,24 @@
 flowchart LR
-    DASH["Dashboard<br/>Laravel 12 + React<br/>Start Scan · Verify"]
+    DASH["Dashboard<br/>Laravel + React (Tableau style)<br/>Start Scan · Verify · Accept risk"]
+    AGENT["Agent API<br/>/api/agent/*<br/>token protected"]
     subgraph A["1 · Scan"]
-        INV[("Asset inventory<br/>3 lab images")] --> TRIVY["Trivy<br/>offline vuln DB"]
+        TRIVY["Trivy<br/>offline vuln DB"]
+        INV[("Asset inventory<br/>3 lab images")]
     end
-    subgraph B["2 · Enrich + prioritize"]
-        ENR["enrich.py<br/>dedupe + score<br/>P = 0.25C + 0.30E + 0.25K + 0.20A"]
+    subgraph B["2 · n8n SOAR pipeline (A to Z)"]
+        N8N["n8n workflows<br/>W1 pipeline · W2 SLA · W3 verification"]
     end
-    subgraph C["3 · Orchestrate (SOAR)"]
-        N8N["n8n<br/>triage · SLA · escalation"]
-    end
-    subgraph D["4 · Track"]
+    subgraph C["3 · Track"]
         GITEA["Gitea<br/>remediation tickets"]
     end
-    subgraph E["5 · Verify"]
-        VER["verify.py<br/>rescan + evidence"]
-    end
-    EPSS["FIRST EPSS API"] --> ENR
-    KEV["CISA KEV catalogue"] --> ENR
-    TRIVY -- "JSON reports" --> ENR
-    ENR -- "ranked findings" --> N8N
-    N8N -- "create / reopen" --> GITEA
-    DASH -- "Start Scan" --> TRIVY
-    DASH -- "Verify" --> VER
-    VER -- "rescan" --> TRIVY
-    VER -- "close or keep open" --> GITEA
+    EPSS["FIRST EPSS API"] --> N8N
+    KEV["CISA KEV catalogue"] --> N8N
+    DASH -- "Start Scan · Verify (webhooks)" --> N8N
+    N8N -- "start / poll / fetch" --> AGENT
+    AGENT --> TRIVY
+    AGENT <--> INV
+    N8N -- "findings.json (ranked)" --> AGENT
+    N8N -- "create tickets (dedupe)" --> GITEA
+    N8N -- "SLA reminders + escalation" --> GITEA
+    N8N -- "proof scan -> close / reopen" --> GITEA
+    DASH --> AGENT

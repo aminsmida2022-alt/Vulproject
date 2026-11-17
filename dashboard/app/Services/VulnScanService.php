@@ -143,7 +143,7 @@ class VulnScanService
             'state' => $status['state'],
             'mode' => $status['mode'] ?? 'local',
             'started_at' => $status['started_at'] ?? null,
-            'progress' => $this->parseProgress($log),
+            'progress' => $this->parseProgress($log, $status['state'] === 'done'),
             'log' => $this->tail($log, 20),
             'errors' => $this->parseErrors($log),
         ];
@@ -165,7 +165,7 @@ class VulnScanService
     }
 
     /** Parse "[*] Scanning <image> -> <reports>/<asset>.json" lines. */
-    private function parseProgress(string $log): array
+    private function parseProgress(string $log, bool $completed = false): array
     {
         $inventory = collect($this->data->inventory());
 
@@ -175,7 +175,8 @@ class VulnScanService
             $scanned[$match[2]] = true;
         }
 
-        $enriched = str_contains($log, 'enriched findings ->');
+        // local mode logs the enrichment; in n8n mode the cycle is closed by markCompleted()
+        $enriched = $completed || str_contains($log, 'enriched findings ->');
 
         return $inventory->map(function ($asset) use ($scanned, $enriched) {
             $state = 'pending';

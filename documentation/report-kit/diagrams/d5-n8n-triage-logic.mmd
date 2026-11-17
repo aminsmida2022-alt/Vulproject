@@ -1,9 +1,0 @@
-flowchart TD
-    W["Webhook<br/>POST /webhook/vuln-findings<br/>917 enriched findings"] --> F{"P >= 60 ?<br/>(P1 / P2)"}
-    F -- no --> X1["ignored<br/>(dashboard only)"]
-    F -- yes --> K["lookup existing ticket<br/>key = CVE + asset"]
-    K --> A{"ticket state?"}
-    A -- "risk-accepted" --> X2["skip<br/>(approved exception)"]
-    A -- "open" --> X3["skip<br/>(duplicate)"]
-    A -- "closed" --> R["reopen + label regression<br/>+ comment"]
-    A -- "none" --> C["create Gitea issue<br/>labels: P1/P2, kev<br/>due date: +7 d / +30 d"]

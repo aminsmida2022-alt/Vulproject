@@ -1,0 +1,20 @@
+flowchart TD
+    n0(["Run manually"]):::trig
+    n1(["Daily 9am<br/><small>cron 0 9 * * *</small>"]):::trig
+    n2(["Manual SLA Check<br/><small>POST /webhook/sla-check</small>"]):::trig
+    n3["Get Open Tickets<br/><small>GET · Gitea API</small>"]:::http
+    n4["Classify SLA"]:::code
+    n5["Add SLA Labels<br/><small>POST · Gitea API</small>"]:::http
+    n6["Post SLA Comment<br/><small>POST · Gitea API</small>"]:::http
+    n0 --> n3
+    n1 --> n3
+    n2 --> n3
+    n3 --> n4
+    n4 --> n5
+    n5 --> n6
+    classDef trig fill:#e8f0fb,stroke:#2a78d6,color:#0b0b0b
+    classDef http fill:#ffffff,stroke:#52514e,color:#0b0b0b
+    classDef code fill:#fdeee7,stroke:#eb6834,color:#0b0b0b
+    classDef cond fill:#fff7e0,stroke:#c98500,color:#0b0b0b
+    classDef wait fill:#f1f1ef,stroke:#8a8984,color:#0b0b0b
+    classDef skip fill:#f1f1ef,stroke:#8a8984,color:#52514e

@@ -1,17 +1,39 @@
 {
+  "id": "EeJXVveoDzwgC5nz",
   "name": "Vulnerability Pipeline (A to Z)",
+  "description": null,
+  "active": true,
   "nodes": [
+    {
+      "parameters": {},
+      "id": "b1000000-0099-4000-8000-pipeline100",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        -200
+      ]
+    },
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 3 * * *" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
         }
       },
       "id": "b1000000-0000-4000-8000-pipeline001",
       "name": "Daily Schedule",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [-400, 0]
+      "position": [
+        -400,
+        0
+      ]
     },
     {
       "parameters": {
@@ -24,7 +46,10 @@
       "name": "Manual Scan Request",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-400, 200],
+      "position": [
+        -400,
+        200
+      ],
       "webhookId": "scan-request"
     },
     {
@@ -34,23 +59,39 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ mode: 'pipeline' }) }}",
         "options": {
-          "response": { "response": { "neverError": true } }
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
         }
       },
       "id": "b1000000-0002-4000-8000-pipeline003",
       "name": "Start Trivy Scan",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-160, 100]
+      "position": [
+        -160,
+        100
+      ]
     },
     {
       "parameters": {
@@ -62,7 +103,10 @@
       "name": "Wait 45s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [80, 100],
+      "position": [
+        80,
+        100
+      ],
       "webhookId": "pipeline-wait-1"
     },
     {
@@ -71,8 +115,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -81,7 +131,10 @@
       "name": "Poll Scan Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [320, 100]
+      "position": [
+        320,
+        100
+      ]
     },
     {
       "parameters": {
@@ -96,7 +149,10 @@
             {
               "leftValue": "={{ $json.state === 'running' }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "true" }
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
             }
           ],
           "combinator": "and"
@@ -107,7 +163,10 @@
       "name": "Still running?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [560, 100]
+      "position": [
+        560,
+        100
+      ]
     },
     {
       "parameters": {
@@ -115,8 +174,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -125,7 +190,10 @@
       "name": "Fetch Raw Findings",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [820, 0]
+      "position": [
+        820,
+        0
+      ]
     },
     {
       "parameters": {
@@ -135,7 +203,10 @@
       "name": "Dedupe Findings",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1060, 0]
+      "position": [
+        1060,
+        0
+      ]
     },
     {
       "parameters": {
@@ -145,7 +216,10 @@
       "name": "Build EPSS Batches",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1300, 0]
+      "position": [
+        1300,
+        0
+      ]
     },
     {
       "parameters": {
@@ -153,7 +227,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -162,7 +239,10 @@
       "name": "Fetch EPSS Scores",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 0]
+      "position": [
+        1540,
+        0
+      ]
     },
     {
       "parameters": {
@@ -172,7 +252,10 @@
       "name": "Merge EPSS",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1780, 0]
+      "position": [
+        1780,
+        0
+      ]
     },
     {
       "parameters": {
@@ -180,8 +263,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -190,7 +279,10 @@
       "name": "Fetch CISA KEV",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2020, 0]
+      "position": [
+        2020,
+        0
+      ]
     },
     {
       "parameters": {
@@ -198,8 +290,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -208,7 +306,10 @@
       "name": "Fetch Asset Inventory",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2260, 0]
+      "position": [
+        2260,
+        0
+      ]
     },
     {
       "parameters": {
@@ -216,19 +317,32 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "neverError": true } }
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
         }
       },
       "id": "b1000000-0013-4000-8000-pipeline014",
       "name": "Fetch Accepted Risks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2500, 0]
+      "position": [
+        2500,
+        0
+      ]
     },
     {
       "parameters": {
@@ -238,7 +352,10 @@
       "name": "Compute Priority",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2740, 0]
+      "position": [
+        2740,
+        0
+      ]
     },
     {
       "parameters": {
@@ -247,9 +364,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Agent-Token", "value": "***REMOVED***" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "X-Agent-Token",
+              "value": "={{ $env.N8N_AGENT_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -261,62 +387,164 @@
       "name": "Publish Findings to Dashboard",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2980, 0]
+      "position": [
+        2980,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Only P1/P2 findings deserve a remediation ticket\nconst { findings } = $input.first().json;\nreturn findings\n  .filter(f => f.priority_score >= 60)\n  .map(f => ({ json: f }));"
+        "jsCode": "// Only P1/P2 findings (score >= 60) deserve a remediation ticket.\n// Read from 'Compute Priority' (the previous node's output is the dashboard's reply).\nconst { findings } = $('Compute Priority').first().json;\nconst candidates = findings.filter(f => f.priority_score >= 60);\nreturn [{ json: { candidates, total_findings: findings.length, ticket_worthy: candidates.length } }];\n"
       },
-      "id": "b1000000-0016-4000-8000-pipeline017",
-      "name": "Ticket-worthy (P1/P2)",
+      "id": "b1000000-0021-4000-8000-pipeline022",
+      "name": "Select P1/P2 Findings",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3220, 0]
+      "position": [
+        3220,
+        0
+      ]
     },
     {
       "parameters": {
-        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues?state=open&q={{ $json.cve }}",
+        "url": "http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/labels?limit=100",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
       },
-      "id": "b1000000-0017-4000-8000-pipeline018",
-      "name": "Check open ticket (dedupe)",
+      "id": "b1000000-0022-4000-8000-pipeline023",
+      "name": "Load Gitea Labels",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3460, 0],
-      "alwaysOutputData": true
+      "position": [
+        3460,
+        0
+      ],
+      "executeOnce": true
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
+        "jsCode": "// Load every remediation ticket (open + closed, paginated) to dedupe and detect regressions.\nconst GITEA = 'http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets';\nconst headers = { Authorization: 'token ' + $env.N8N_GITEA_TOKEN, Accept: 'application/json' };\nconst tickets = [];\nfor (let page = 1; page < 50; page++) {\n  const batch = await this.helpers.httpRequest({\n    url: `${GITEA}/issues?state=all&type=issues&limit=50&page=${page}`, headers, json: true,\n  });\n  tickets.push(...batch.map(i => ({\n    number: i.number, state: i.state, title: i.title,\n    labels: (i.labels || []).map(l => ({ id: l.id, name: l.name })),\n  })));\n  if (batch.length < 50) break;\n}\nconst labelIds = Object.fromEntries($('Load Gitea Labels').all().map(i => [i.json.name, i.json.id]));\nreturn [{ json: { tickets, labelIds } }];\n"
+      },
+      "id": "b1000000-0023-4000-8000-pipeline024",
+      "name": "Load Existing Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3700,
+        0
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decide one action per P1/P2 finding:\n//   create  -> no ticket yet for this CVE + asset\n//   reopen  -> ticket was closed (verified fixed) but the CVE is back = regression\n//   skip    -> ticket already open, or risk formally accepted\nconst SLA_DAYS = { 'P1-CRITICAL': 7, 'P2-HIGH': 30 };\nconst TITLE_RE = /\\[(P\\d-[A-Z]+)\\] Fix (CVE-\\d{4}-\\d+) on (.+)$/;\nconst { candidates } = $('Select P1/P2 Findings').first().json;\nconst { tickets, labelIds } = $input.first().json;\n\nconst byKey = {};\nfor (const t of tickets) {\n  const m = t.title.match(TITLE_RE);\n  if (!m) continue;\n  const key = m[2] + '|' + m[3].trim();\n  if (!byKey[key] || t.number > byKey[key].number) byKey[key] = t;  // latest ticket wins\n}\nconst has = (t, name) => t.labels.some(l => l.name === name);\nconst scanDate = new Date().toISOString();\nconst out = [];\n\nfor (const f of candidates) {\n  const t = byKey[f.cve + '|' + f.asset_name];\n  const ref = { cve: f.cve, asset: f.asset_name, priority: f.priority, score: f.priority_score };\n\n  if (t && has(t, 'risk-accepted')) { out.push({ json: { ...ref, action: 'skip', reason: 'risk-accepted', ticket: t.number } }); continue; }\n  if (t && t.state === 'open')      { out.push({ json: { ...ref, action: 'skip', reason: 'already-open', ticket: t.number } }); continue; }\n\n  if (t && t.state === 'closed') {\n    const labels = t.labels.filter(l => l.name !== 'verified-fixed').map(l => l.id);\n    if (labelIds['regression'] && !labels.includes(labelIds['regression'])) labels.push(labelIds['regression']);\n    out.push({ json: { ...ref, action: 'reopen', ticket: t.number, labels,\n      comment: `### Regression detected\\n${f.cve} is present again on **${f.asset_name}** ` +\n               `(${f.pkg} ${f.installed}) in the scan of ${scanDate}.\\n` +\n               `Ticket reopened automatically by the n8n pipeline.` } });\n    continue;\n  }\n\n  const days = SLA_DAYS[f.priority] ?? 30;\n  const due = new Date(Date.now() + days * 86400000);\n  const epss = f.epss != null ? (f.epss * 100).toFixed(2) + '%' : 'unknown';\n  const body = [\n    '## Remediation ticket', '',\n    '| Field | Value |', '|---|---|',\n    `| CVE | ${f.cve} |`,\n    `| Asset | ${f.asset_name} (\\`${f.asset_id}\\`, ${f.asset_criticality ?? '-'} importance) |`,\n    `| Package | ${f.pkg} - installed ${f.installed}, fixed in ${f.fixed || 'no fixed version available'} |`,\n    `| Severity | ${f.severity} (CVSS ${f.cvss}) |`,\n    `| EPSS exploitation probability | ${epss} |`,\n    `| CISA KEV listed | ${f.kev ? 'YES - actively exploited in the wild' : 'No'} |`,\n    `| Contextual priority | ${f.priority_score} / 100 - ${f.priority} |`,\n    `| SLA deadline | ${due.toISOString().slice(0, 10)} (${days} days) |`,\n    '', '> ' + (f.title || ''), '',\n    '### Priority formula',\n    'P = 0.25*CVSS + 0.30*EPSS + 0.25*KEV + 0.20*Asset importance', '',\n    '### Acceptance criteria',\n    '- [ ] Apply the fix (upgrade package or rebuild image)',\n    '- [ ] Request verification scan (dashboard -> Verify)',\n    '- [ ] Ticket is closed ONLY if a new scan proves the finding is gone', '',\n    '_Created by the n8n pipeline (scan -> EPSS/KEV/asset -> priority -> ticket)._',\n  ].join('\\n');\n  out.push({ json: { ...ref, action: 'create', payload: {\n    title: `[${f.priority}] Fix ${f.cve} on ${f.asset_name}`,\n    body,\n    labels: [labelIds[f.priority], f.kev ? labelIds['kev'] : null].filter(Boolean),\n    due_date: due.toISOString(),\n  } } });\n}\n\nconst count = a => out.filter(o => o.json.action === a).length;\nconsole.log('triage', JSON.stringify({ candidates: candidates.length, create: count('create'), reopen: count('reopen'), skip: count('skip') }));\nreturn out;\n"
+      },
+      "id": "b1000000-0024-4000-8000-pipeline025",
+      "name": "Triage: create / reopen / skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3940,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
             {
-              "leftValue": "={{ $json.number === undefined }}",
-              "rightValue": true,
-              "operator": { "type": "boolean", "operation": "true" }
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "create",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "create"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reopen",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reopen"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "skip",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "skip"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {}
       },
-      "id": "b1000000-0018-4000-8000-pipeline019",
-      "name": "No open ticket yet?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [3700, 0]
+      "id": "b1000000-0025-4000-8000-pipeline026",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        4180,
+        0
+      ]
     },
     {
       "parameters": {
@@ -325,92 +553,460 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
+        "options": {},
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify((function(){ var f = $('Ticket-worthy (P1/P2)').item.json; var kev = f.kev ? 'YES - actively exploited in the wild (CISA KEV)' : 'No'; var fix = f.fixed ? f.fixed : 'no fixed version available'; var epss = f.epss != null ? (f.epss * 100).toFixed(2) + '%' : 'unknown'; var lines = [ '## Remediation ticket', '', '| Field | Value |', '|---|---|', '| CVE | ' + f.cve + ' |', '| Asset | ' + f.asset_name + ' (' + f.asset_criticality + ' importance) |', '| Package | ' + f.pkg + ' - installed ' + f.installed + ', fixed in ' + fix + ' |', '| Severity | ' + f.severity + ' (CVSS ' + f.cvss + ') |', '| EPSS exploitation probability | ' + epss + ' |', '| CISA KEV listed | ' + kev + ' |', '| Contextual priority | ' + f.priority_score + ' / 100 - ' + f.priority + ' |', '', '> ' + (f.title || ''), '', '### Priority formula', 'P = 0.25*CVSS + 0.30*EPSS + 0.25*KEV + 0.20*Asset importance', '', '### Acceptance criteria', '- [ ] Apply the fix (upgrade package or rebuild image)', '- [ ] Request verification scan', '- [ ] Ticket is closed ONLY if a new scan proves the finding is gone' ]; return { title: '[' + f.priority + '] Fix ' + f.cve + ' on ' + f.asset_name, body: lines.join('\\n') }; })()) }}",
-        "options": {}
+        "jsonBody": "={{ JSON.stringify($json.payload) }}"
       },
-      "id": "b1000000-0019-4000-8000-pipeline020",
+      "id": "b1000000-0026-4000-8000-pipeline027",
       "name": "Create Gitea Ticket",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3940, 0]
+      "position": [
+        4420,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $json.ticket }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ state: 'open' }) }}"
+      },
+      "id": "b1000000-0027-4000-8000-pipeline028",
+      "name": "Reopen Ticket (regression)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4420,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $('Route by Action').item.json.ticket }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: $('Route by Action').item.json.labels }) }}"
+      },
+      "id": "b1000000-0028-4000-8000-pipeline029",
+      "name": "Set Regression Labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $('Route by Action').item.json.ticket }}/comments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=token {{ $env.N8N_GITEA_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: $('Route by Action').item.json.comment }) }}"
+      },
+      "id": "b1000000-0029-4000-8000-pipeline030",
+      "name": "Comment Regression",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4900,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b1000000-0030-4000-8000-pipeline031",
+      "name": "Already handled (skip)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4420,
+        200
+      ]
     }
   ],
   "connections": {
     "Daily Schedule": {
-      "main": [[{ "node": "Start Trivy Scan", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Start Trivy Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Manual Scan Request": {
-      "main": [[{ "node": "Start Trivy Scan", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Start Trivy Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Start Trivy Scan": {
-      "main": [[{ "node": "Wait 45s", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait 45s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait 45s": {
-      "main": [[{ "node": "Poll Scan Status", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Poll Scan Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Poll Scan Status": {
-      "main": [[{ "node": "Still running?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Still running?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Still running?": {
       "main": [
-        [{ "node": "Wait 45s", "type": "main", "index": 0 }],
-        [{ "node": "Fetch Raw Findings", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Wait 45s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Raw Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Fetch Raw Findings": {
-      "main": [[{ "node": "Dedupe Findings", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Dedupe Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Dedupe Findings": {
-      "main": [[{ "node": "Build EPSS Batches", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build EPSS Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build EPSS Batches": {
-      "main": [[{ "node": "Fetch EPSS Scores", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch EPSS Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch EPSS Scores": {
-      "main": [[{ "node": "Merge EPSS", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Merge EPSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Merge EPSS": {
-      "main": [[{ "node": "Fetch CISA KEV", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch CISA KEV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch CISA KEV": {
-      "main": [[{ "node": "Fetch Asset Inventory", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch Asset Inventory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Asset Inventory": {
-      "main": [[{ "node": "Fetch Accepted Risks", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch Accepted Risks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Accepted Risks": {
-      "main": [[{ "node": "Compute Priority", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Compute Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Compute Priority": {
-      "main": [[{ "node": "Publish Findings to Dashboard", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Publish Findings to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Publish Findings to Dashboard": {
-      "main": [[{ "node": "Ticket-worthy (P1/P2)", "type": "main", "index": 0 }]]
-    },
-    "Ticket-worthy (P1/P2)": {
-      "main": [[{ "node": "Check open ticket (dedupe)", "type": "main", "index": 0 }]]
-    },
-    "Check open ticket (dedupe)": {
-      "main": [[{ "node": "No open ticket yet?", "type": "main", "index": 0 }]]
-    },
-    "No open ticket yet?": {
       "main": [
-        [{ "node": "Create Gitea Ticket", "type": "main", "index": 0 }],
-        []
+        [
+          {
+            "node": "Select P1/P2 Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select P1/P2 Findings": {
+      "main": [
+        [
+          {
+            "node": "Load Gitea Labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Gitea Labels": {
+      "main": [
+        [
+          {
+            "node": "Load Existing Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Existing Tickets": {
+      "main": [
+        [
+          {
+            "node": "Triage: create / reopen / skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Triage: create / reopen / skip": {
+      "main": [
+        [
+          {
+            "node": "Route by Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Action": {
+      "main": [
+        [
+          {
+            "node": "Create Gitea Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reopen Ticket (regression)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already handled (skip)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reopen Ticket (regression)": {
+      "main": [
+        [
+          {
+            "node": "Set Regression Labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Regression Labels": {
+      "main": [
+        [
+          {
+            "node": "Comment Regression",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Start Trivy Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
-  "active": false,
-  "settings": { "executionOrder": "v1" },
-  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Daily Schedule": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
   "meta": {
     "description": "Full A-to-Z SOAR pipeline: scheduled/manual trigger, Trivy scan via agent API, dedupe, EPSS + CISA KEV enrichment, contextual priority scoring, dashboard publication, Gitea ticket creation with dedupe."
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": null,
+    "description": null
   }
 }

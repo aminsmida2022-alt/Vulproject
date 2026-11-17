@@ -39,7 +39,7 @@ return [
     'orchestrator' => env('VULNMGMT_ORCHESTRATOR', 'n8n'),
 
     // shared secret between Laravel and n8n (X-Agent-Token header)
-    'agent_token' => env('VULNMGMT_AGENT_TOKEN', '***REMOVED***'),
+    'agent_token' => env('VULNMGMT_AGENT_TOKEN', ''),
 
     'gitea' => [
         'url' => env('VULNMGMT_GITEA_URL', 'http://localhost:3001'),
