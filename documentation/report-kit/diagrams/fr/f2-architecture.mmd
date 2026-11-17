@@ -1,0 +1,12 @@
+flowchart LR
+    DASH["Tableau de bord<br/>Laravel + React<br/><i>Start Scan · Verify</i>"]
+    N8N["n8n (SOAR)<br/>W1 pipeline de A à Z<br/>W2 SLA et escalade<br/>W3 vérification"]
+    AGENT["API agent Laravel<br/>/api/agent/*<br/>protégée par jeton"]
+    TRIVY["Trivy<br/>base hors ligne<br/>3 images"]
+    GITEA["Gitea<br/>tickets de remédiation"]
+    FEEDS["API EPSS (FIRST)<br/>catalogue CISA KEV"]
+    DASH -- "webhooks" --> N8N
+    FEEDS --> N8N
+    N8N -- "scan, résultats, preuves" --> AGENT
+    AGENT -- "lance" --> TRIVY
+    N8N -- "créer · rouvrir · relancer · clore" --> GITEA

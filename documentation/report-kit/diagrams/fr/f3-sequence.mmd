@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    actor A as Analyste
+    participant D as Tableau de bord
+    participant N as n8n
+    participant L as API agent + Trivy
+    participant G as Gitea
+    A->>D: Start Scan (ou planification n8n à 03:00)
+    D->>N: POST /webhook/scan-request (W1)
+    N->>L: lancer le scan, puis suivre toutes les 45 s
+    N->>L: lire les résultats bruts
+    N->>N: dédoublonnage, EPSS, KEV, actifs, exceptions, calcul de P
+    N->>L: publier les 917 résultats classés
+    N->>G: créer, rouvrir (regression) ou ignorer les tickets P1/P2
+    Note over N,G: chaque jour à 09:00 (W2) : rappel à 75 % du délai, escalade si dépassé
+    A->>A: corriger l'actif (image, paquet)
+    A->>D: Verify (ticket)
+    D->>N: POST /webhook/verify-request (W3)
+    N->>L: nouveau scan de preuve
+    alt CVE disparue
+        N->>G: commentaire de preuve, verified-fixed, clôture
+    else CVE toujours présente
+        N->>G: commentaire de preuve, verification-failed, reste ouvert
+    end
+    N->>L: enregistrer la preuve (tickets/evidence)

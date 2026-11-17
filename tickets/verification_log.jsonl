@@ -9,3 +9,9 @@
 {"ticket": 14, "cve": "CVE-2023-44487", "asset_id": "web-server", "image": "nginx:1.28.0", "result": "fixed", "verified_at": "2026-11-16T20:16:12+00:00", "evidence_file": "tickets/evidence/14-20261116T201612Z.json"}
 {"ticket": 15, "cve": "CVE-2023-4911", "asset_id": "test-server", "image": "python:3.7-slim", "result": "still-present", "verified_at": "2026-11-16T20:40:35+00:00", "evidence_file": "tickets/evidence/15-20261116T204035Z.json"}
 {"ticket":15,"cve":"CVE-2023-4911","asset_id":"test-server","image":"python:3.7-slim","verified_at":"2026-11-17T14:14:02+00:00","result":"still-present","evidence_file":"tickets\/evidence\/15-20261117T141402Z.json"}
+{"ticket":4,"cve":"CVE-2022-2068","asset_id":"web-server","image":"nginx:1.28.0","verified_at":"2026-11-17T14:29:02+00:00","result":"fixed","evidence_file":"tickets\/evidence\/4-20261117T142902Z.json"}
+{"ticket":7,"cve":"CVE-2023-50387","asset_id":"web-server","image":"nginx:1.28.0","verified_at":"2026-11-17T14:30:03+00:00","result":"fixed","evidence_file":"tickets\/evidence\/7-20261117T143003Z.json"}
+{"ticket":9,"cve":"CVE-2023-4863","asset_id":"web-server","image":"nginx:1.28.0","verified_at":"2026-11-17T14:31:00+00:00","result":"fixed","evidence_file":"tickets\/evidence\/9-20261117T143100Z.json"}
+{"ticket":10,"cve":"CVE-2021-3711","asset_id":"web-server","image":"nginx:1.28.0","verified_at":"2026-11-17T14:31:58+00:00","result":"fixed","evidence_file":"tickets\/evidence\/10-20261117T143158Z.json"}
+{"ticket":12,"cve":"CVE-2024-2961","asset_id":"web-server","image":"nginx:1.28.0","verified_at":"2026-11-17T14:32:56+00:00","result":"fixed","evidence_file":"tickets\/evidence\/12-20261117T143256Z.json"}
+{"ticket":14,"cve":"CVE-2023-44487","asset_id":"web-server","image":"nginx:1.28.0","verified_at":"2026-11-17T14:33:54+00:00","result":"fixed","evidence_file":"tickets\/evidence\/14-20261117T143354Z.json"}

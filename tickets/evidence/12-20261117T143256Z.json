@@ -1,0 +1,13 @@
+{
+    "ticket": 12,
+    "cve": "CVE-2024-2961",
+    "asset_id": "web-server",
+    "asset_name": "Web Server",
+    "image": "nginx:1.28.0",
+    "scanned_at": "2026-11-17T14:32:56.733Z",
+    "scanner": "trivy (n8n proof scan)",
+    "total_findings": 2057,
+    "verified_at": "2026-11-17T14:32:56+00:00",
+    "result": "fixed",
+    "verified_by": "n8n Remediation Verification"
+}

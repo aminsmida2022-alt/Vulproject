@@ -1,0 +1,14 @@
+flowchart TD
+    T(["Déclencheurs : Start Scan (webhook), 03:00, ou exécution manuelle"]) --> S["1. Lancer le scan Trivy (API agent)"]
+    S --> W["2. Attendre 45 s puis interroger l'état"]
+    W --> R{"Scan terminé ?"}
+    R -- non --> W
+    R -- oui --> F["3. Lire les résultats bruts, dédoublonner (CVE + actif)"]
+    F --> E["4. Enrichir : EPSS par lots, KEV, importance de l'actif, exceptions"]
+    E --> P["5. Calculer P = 0,25·C + 0,30·E + 0,25·K + 0,20·A"]
+    P --> PUB["6. Publier les 917 résultats dans le tableau de bord"]
+    PUB --> SEL["7. Garder P ≥ 60 (P1, P2), lire les tickets Gitea existants"]
+    SEL --> TRI{"Ticket existant pour CVE + actif ?"}
+    TRI -- "aucun" --> C["Créer le ticket : labels P1/P2, kev, échéance 7 ou 30 jours"]
+    TRI -- "clos" --> RE["Rouvrir : label regression + commentaire"]
+    TRI -- "ouvert ou risk-accepted" --> SK["Ignorer"]

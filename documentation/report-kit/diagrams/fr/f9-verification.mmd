@@ -1,0 +1,7 @@
+flowchart TD
+    S["L'analyste clique sur Verify<br/>(ou exécution manuelle dans n8n)"] --> W["n8n W3 : lire le ticket Gitea<br/>extraire la CVE et l'actif du titre"]
+    W --> T["Nouveau scan de preuve (API agent)<br/>attendre la fin du scan"]
+    T --> Q{"CVE encore présente<br/>sur cet actif ?"}
+    Q -- non --> OK["Commentaire de preuve<br/>label verified-fixed<br/>ticket CLOS"]
+    Q -- oui --> KO["Commentaire de preuve<br/>label verification-failed<br/>ticket reste ouvert"]
+    T --> E[("Preuve enregistrée<br/>tickets/evidence/*.json<br/>verification_log.jsonl")]

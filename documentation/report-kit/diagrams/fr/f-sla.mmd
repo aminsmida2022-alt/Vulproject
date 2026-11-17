@@ -1,0 +1,6 @@
+flowchart LR
+    T(["Chaque jour à 09:00<br/>ou webhook sla-check"]) --> G["Lire les tickets ouverts"]
+    G --> C{"Pour chaque ticket<br/>(sauf risk-accepted)"}
+    C -- "75 % du délai écoulé" --> R["Commentaire de rappel<br/>label sla-warning"]
+    C -- "échéance dépassée" --> X["Commentaire d'escalade<br/>labels sla-breached + escalated"]
+    C -- "dans les temps" --> N["Rien à faire"]

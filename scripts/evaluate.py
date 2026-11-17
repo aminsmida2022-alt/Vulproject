@@ -81,6 +81,9 @@ def pct(x):
 
 def main():
     findings = json.loads(FINDINGS.read_text())
+    for f in findings:  # n8n writes null when a CVE has no CVSS / EPSS score
+        f["cvss"] = f.get("cvss") or 0.0
+        f["epss"] = f.get("epss") or 0.0
     if not findings:
         raise SystemExit("FATAL: findings.json is empty - run scan + enrich first")
 
