@@ -119,9 +119,6 @@ step of the A-to-Z run is inspectable there.
 scanner/scan_all.sh                              # all assets from the inventory
 scanner/scan_all.sh nginx:1.28.0 web-server      # one asset
 python3 scripts/enrich.py                        # dedupe + EPSS + KEV + score
-curl -X POST -H 'Content-Type: application/json' \
-  --data-binary @data/vulnerabilities/findings.json \
-  http://localhost:5678/webhook/vuln-findings    # tickets (legacy workflow)
 curl -X POST http://localhost:5678/webhook/scan-request       # n8n pipeline
 curl -X POST http://localhost:5678/webhook/sla-check          # SLA pass now
 curl -X POST -H 'Content-Type: application/json' \
