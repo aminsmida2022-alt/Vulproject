@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Platform Overview</title>
+<style>
+  :root {
+    --bg:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --line:#d9d8d3; --card:#ffffff;
+    --blue:#2a78d6; --blue-bg:#eaf2fc; --orange:#eb6834; --orange-bg:#fdf0ea;
+    --gray-bg:#f3f3f1; --green:#0a7d3c; --green-bg:#e6f4ec; --red:#c62828; --red-bg:#fdecec;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); font-family:Inter, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink); }
+  .slide { width:1600px; height:900px; padding:44px 48px; display:flex; flex-direction:column; }
+  h1 { margin:0; font-size:34px; font-weight:700; letter-spacing:-.01em; }
+  .sub { margin:6px 0 0; color:var(--ink2); font-size:17px; }
+  .flow { flex:1; display:grid; grid-template-columns:230px 56px 560px 56px 230px 56px 1fr; align-items:center; margin-top:28px; }
+  .card { background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:18px 20px; }
+  .tag { display:inline-block; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:4px 9px; border-radius:6px; }
+  .t-blue { background:var(--blue-bg); color:#1c5cab; }
+  .t-orange { background:var(--orange-bg); color:#b34a1f; }
+  .t-gray { background:var(--gray-bg); color:var(--ink2); }
+  .title { font-size:21px; font-weight:700; margin:10px 0 4px; }
+  .muted { color:var(--ink2); font-size:15px; line-height:1.45; }
+  /* triggers */
+  .trig { border-color:var(--blue); }
+  .trig .row { display:flex; gap:10px; align-items:center; font-size:17px; font-weight:600; margin-top:14px; }
+  .trig .ico { width:34px; height:34px; border-radius:9px; background:var(--blue-bg); display:grid; place-items:center; font-size:18px; }
+  .or { text-align:center; color:var(--ink2); font-size:13px; margin:10px 0 0; }
+  /* W1 */
+  .w1 { border-color:var(--orange); border-width:2px; padding:20px 22px; }
+  .steps { list-style:none; margin:14px 0 0; padding:0; display:grid; gap:9px; }
+  .steps li { display:grid; grid-template-columns:28px 1fr; gap:12px; align-items:start; font-size:16px; line-height:1.35; }
+  .num { width:28px; height:28px; border-radius:50%; background:var(--orange); color:#fff; font-weight:700; font-size:14px; display:grid; place-items:center; }
+  .formula { font-family:ui-monospace, "SF Mono", Menlo, monospace; font-size:14px; background:var(--gray-bg); padding:2px 6px; border-radius:5px; white-space:nowrap; }
+  .last { font-weight:700; }
+  /* gitea */
+  .gitea { text-align:center; padding:24px 18px; }
+  .gitea .big { font-size:46px; line-height:1; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:14px; }
+  .chip { font-size:12px; font-weight:700; color:#fff; padding:3px 8px; border-radius:5px; }
+  /* right column */
+  .stack { display:grid; gap:22px; }
+  .w { border-color:var(--orange); }
+  .when { font-size:14px; color:var(--ink2); margin-top:2px; }
+  .out { display:flex; gap:10px; align-items:center; margin-top:10px; padding:9px 12px; border-radius:10px; font-size:15px; font-weight:600; }
+  .o-green { background:var(--green-bg); color:var(--green); }
+  .o-red { background:var(--red-bg); color:var(--red); }
+  .o-amber { background:#fff6e0; color:#8a5a00; }
+  .arrow { display:grid; place-items:center; }
+  .legend { display:flex; gap:26px; color:var(--ink2); font-size:14px; margin-top:14px; }
+  .legend span::before { content:""; display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:7px; vertical-align:-1px; background:var(--c); }
+</style></head>
+<body>
+<div class="slide">
+  <h1>How the platform works</h1>
+  <p class="sub">Scan → prioritize by real risk → ticket → follow the deadline → prove the fix</p>
+
+  <div class="flow">
+    <!-- 1. trigger -->
+    <div class="card trig">
+      <span class="tag t-blue">Start</span>
+      <div class="row"><div class="ico">▶</div>"Start Scan" in the dashboard</div>
+      <div class="or">or</div>
+      <div class="row" style="margin-top:6px"><div class="ico">⏰</div>Automatic, daily 03:00</div>
+    </div>
+
+    <div class="arrow"><svg width="56" height="24"><path d="M4 12 H44" stroke="#8a8984" stroke-width="2.5"/><path d="M42 5 L52 12 L42 19 Z" fill="#8a8984"/></svg></div>
+
+    <!-- 2. workflow 1 -->
+    <div class="card w1">
+      <span class="tag t-orange">n8n · Workflow 1</span>
+      <div class="title">Vulnerability Pipeline (A to Z)</div>
+      <ol class="steps">
+        <li><span class="num">1</span><span>Scan the 3 servers with Trivy</span></li>
+        <li><span class="num">2</span><span>Wait until the scan is finished (check every 45 s)</span></li>
+        <li><span class="num">3</span><span>Collect the results, remove duplicates</span></li>
+        <li><span class="num">4</span><span>Add EPSS · CISA KEV · asset importance · accepted risks</span></li>
+        <li><span class="num">5</span><span>Score each finding <span class="formula">P = 0.25·CVSS + 0.30·EPSS + 0.25·KEV + 0.20·Asset</span></span></li>
+        <li><span class="num">6</span><span>Send all 917 findings to the dashboard</span></li>
+        <li><span class="num">7</span><span class="last">Keep only P1/P2 (P ≥ 60) → create, reopen or skip a ticket</span></li>
+      </ol>
+    </div>
+
+    <div class="arrow"><svg width="56" height="24"><path d="M4 12 H44" stroke="#8a8984" stroke-width="2.5"/><path d="M42 5 L52 12 L42 19 Z" fill="#8a8984"/></svg></div>
+
+    <!-- 3. gitea -->
+    <div class="card gitea">
+      <span class="tag t-gray">Gitea</span>
+      <div class="big" style="margin-top:14px">🎫</div>
+      <div class="title">Tickets live here</div>
+      <div class="muted">One ticket per CVE + server, with a deadline</div>
+      <div class="chips">
+        <span class="chip" style="background:#b60205">P1 · 7 days</span>
+        <span class="chip" style="background:#d93f0b">P2 · 30 days</span>
+        <span class="chip" style="background:#5319e7">kev</span>
+      </div>
+    </div>
+
+    <div class="arrow"><svg width="56" height="300"><path d="M4 150 H22 V60 H44 M22 150 V240 H44" fill="none" stroke="#8a8984" stroke-width="2.5"/><path d="M42 53 L52 60 L42 67 Z M42 233 L52 240 L42 247 Z" fill="#8a8984"/></svg></div>
+
+    <!-- 4. workflows 2 + 3 -->
+    <div class="stack">
+      <div class="card w">
+        <span class="tag t-orange">n8n · Workflow 2</span>
+        <div class="title">SLA Reminder &amp; Escalation</div>
+        <div class="when">Automatic, daily 09:00</div>
+        <div class="out o-amber">⏳ 75% of the deadline → reminder</div>
+        <div class="out o-red">⚠ Deadline passed → escalation</div>
+      </div>
+      <div class="card w">
+        <span class="tag t-orange">n8n · Workflow 3</span>
+        <div class="title">Remediation Verification</div>
+        <div class="when">When you click "Verify" → rescan the server</div>
+        <div class="out o-green">✓ CVE gone → ticket closed with evidence</div>
+        <div class="out o-red">✗ CVE still there → stays open (verification-failed)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span style="--c:var(--blue)">Trigger</span>
+    <span style="--c:var(--orange)">n8n automation (SOAR)</span>
+    <span style="--c:#8a8984">Ticketing (Gitea)</span>
+  </div>
+</div>
+</body></html>

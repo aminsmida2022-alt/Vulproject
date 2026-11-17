@@ -12,7 +12,8 @@ Do not change the numbers or make up new ones.
 
 | Folder | File | What it shows | Use it in |
 |---|---|---|---|
-| `diagrams/` | `d1-architecture` | Components: dashboard, n8n (3 workflows), Laravel agent API, Trivy, Gitea, EPSS/KEV | Report ch. 3 · Slide 5 |
+| `diagrams/` | `d0-platform-overview` | **Simple one-slide overview**: trigger → n8n workflow 1 (7 steps) → Gitea tickets → workflows 2 (SLA) and 3 (verification). PNG 16:9, PDF, editable HTML | Report ch. 3 · **Slide 4 (start here)** |
+| | `d1-architecture` | Components: dashboard, n8n (3 workflows), Laravel agent API, Trivy, Gitea, EPSS/KEV | Report ch. 3 · Slide 5 |
 | | `d2-end-to-end-sequence` | Sequence from "Start Scan" to the proven fix | Report ch. 3 · Slide 6 |
 | | `d3-ticket-lifecycle` | Ticket states: open, escalated, closed, accepted, regression | Report ch. 4 · Slide 9 |
 | | `d4-priority-model` | P = 0.25·CVSS + 0.30·EPSS + 0.25·KEV + 0.20·Asset → P1/P2/P3–P5 | Report ch. 4 · Slide 7 |
