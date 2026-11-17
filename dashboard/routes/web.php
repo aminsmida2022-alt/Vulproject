@@ -12,6 +12,8 @@ Route::post('/tickets/verify', [VulnDashboardController::class, 'verify'])
     ->name('vuln.verify');
 Route::get('/tickets/verify/status', [VulnDashboardController::class, 'verifyStatus'])
     ->name('vuln.verify.status');
+Route::post('/tickets/accept-risk', [VulnDashboardController::class, 'acceptRisk'])
+    ->name('vuln.accept-risk');
 
 Route::middleware(['auth'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');

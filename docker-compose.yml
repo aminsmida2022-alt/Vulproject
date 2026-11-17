@@ -26,6 +26,8 @@ services:
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false   # allow $env.N8N_GITEA_TOKEN in workflows
       - N8N_GITEA_TOKEN=${N8N_GITEA_TOKEN:?set N8N_GITEA_TOKEN in .env}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach Laravel on the host
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/home/node/import-workflows:ro

@@ -36,8 +36,13 @@ class VulnScanService
 
     /**
      * Launch the scan detached. Returns false if one is already running.
+     *
+     * Modes:
+     *  - "pipeline": Trivy only — n8n orchestrates enrichment afterwards
+     *                and POSTs the final findings (state 'enriching' until then).
+     *  - "local":    Trivy + enrich.py + notify n8n (legacy fallback).
      */
-    public function start(): array
+    public function start(string $mode = 'pipeline'): array
     {
         if ($this->isRunning()) {
             return ['started' => false, 'reason' => 'A scan is already running.'];
@@ -47,16 +52,20 @@ class VulnScanService
         $log = $this->logFile();
         @touch($log);
 
-        $cmd = sprintf(
-            'nohup bash -c %s > %s 2>&1 & echo $!',
-            escapeshellarg(
-                'cd '.escapeshellarg($root).' && '.
-                'bash '.config('vulnmgmt.scan_script').' && '.
+        if ($mode === 'local') {
+            $pipeline = 'bash '.config('vulnmgmt.scan_script').' && '.
                 config('vulnmgmt.enrich_script').' && '.
                 'curl -sf -m 30 -X POST -H "Content-Type: application/json" '.
                 '--data-binary @data/vulnerabilities/findings.json '.
-                config('vulnmgmt.n8n_webhook').' || true'
-            ),
+                config('vulnmgmt.n8n_webhook').' || true';
+        } else {
+            // n8n handles enrichment + ticketing; we stop after Trivy
+            $pipeline = 'bash '.config('vulnmgmt.scan_script');
+        }
+
+        $cmd = sprintf(
+            'nohup bash -c %s > %s 2>&1 & echo $!',
+            escapeshellarg('cd '.escapeshellarg($root).' && '.$pipeline),
             escapeshellarg($log)
         );
 
@@ -69,11 +78,26 @@ class VulnScanService
         $this->writeStatus([
             'pid' => $pid,
             'state' => 'running',
+            'mode' => $mode,
             'started_at' => now()->toDateTimeString(),
             'log_file' => $log,
         ]);
 
-        return ['started' => true, 'pid' => $pid];
+        return ['started' => true, 'pid' => $pid, 'mode' => $mode];
+    }
+
+    /** Called by the agent API once n8n finishes the enrichment phase. */
+    public function markCompleted(string $state = 'done'): void
+    {
+        $status = $this->readStatus();
+
+        if ($status === null) {
+            return;
+        }
+
+        $status['state'] = $state;
+        $status['finished_at'] = now()->toDateTimeString();
+        $this->writeStatus($status);
     }
 
     /** Current scan state + parsed progress + log tail. */
@@ -96,9 +120,19 @@ class VulnScanService
             $failed = str_contains($log, 'FATAL') ||
                 str_contains($log, 'Traceback (most recent call last)');
 
-            $status['state'] = $failed ? 'failed' : 'done';
-            $status['finished_at'] = now()->toDateTimeString();
-            $this->writeStatus($status);
+            if ($failed) {
+                $status['state'] = 'failed';
+                $status['finished_at'] = now()->toDateTimeString();
+                $this->writeStatus($status);
+            } elseif (($status['mode'] ?? 'local') === 'pipeline') {
+                // Trivy finished; n8n is now enriching + creating tickets
+                $status['state'] = 'enriching';
+                $this->writeStatus($status);
+            } else {
+                $status['state'] = 'done';
+                $status['finished_at'] = now()->toDateTimeString();
+                $this->writeStatus($status);
+            }
         }
 
         $log = file_exists($status['log_file'])
@@ -107,6 +141,7 @@ class VulnScanService
 
         return [
             'state' => $status['state'],
+            'mode' => $status['mode'] ?? 'local',
             'started_at' => $status['started_at'] ?? null,
             'progress' => $this->parseProgress($log),
             'log' => $this->tail($log, 20),
@@ -118,11 +153,15 @@ class VulnScanService
     {
         $status = $this->readStatus();
 
-        if ($status === null || ($status['state'] ?? '') !== 'running') {
+        if ($status === null) {
             return false;
         }
 
-        return $this->pidAlive($status['pid'] ?? 0);
+        if (in_array($status['state'] ?? '', ['running', 'enriching'], true)) {
+            return true;
+        }
+
+        return false;
     }
 
     /** Parse "[*] Scanning <image> -> <reports>/<asset>.json" lines. */

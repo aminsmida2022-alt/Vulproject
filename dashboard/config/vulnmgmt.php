@@ -31,6 +31,15 @@ return [
     | after every scan, and Gitea API for the tickets panel.
     */
     'n8n_webhook' => env('VULNMGMT_N8N_WEBHOOK', 'http://localhost:5678/webhook/vuln-findings'),
+    'n8n_scan_webhook' => env('VULNMGMT_N8N_SCAN_WEBHOOK', 'http://localhost:5678/webhook/scan-request'),
+    'n8n_verify_webhook' => env('VULNMGMT_N8N_VERIFY_WEBHOOK', 'http://localhost:5678/webhook/verify-request'),
+
+    // 'n8n' = n8n orchestrates the whole pipeline (scan -> enrich -> tickets)
+    // 'local' = everything runs locally as a fallback
+    'orchestrator' => env('VULNMGMT_ORCHESTRATOR', 'n8n'),
+
+    // shared secret between Laravel and n8n (X-Agent-Token header)
+    'agent_token' => env('VULNMGMT_AGENT_TOKEN', '***REMOVED***'),
 
     'gitea' => [
         'url' => env('VULNMGMT_GITEA_URL', 'http://localhost:3001'),

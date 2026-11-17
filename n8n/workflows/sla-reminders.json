@@ -1,0 +1,157 @@
+{
+  "name": "SLA Reminder and Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }]
+        }
+      },
+      "id": "c2000000-0000-4000-8000-sla000001",
+      "name": "Daily 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-440, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sla-check",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "c2000000-0006-4000-8000-sla000007",
+      "name": "Manual SLA Check",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-440, 200],
+      "webhookId": "sla-check"
+    },
+    {
+      "parameters": {
+        "url": "http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues?state=open&limit=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c2000000-0001-4000-8000-sla000002",
+      "name": "Get Open Tickets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 0],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// SLA policy: P1 must be fixed in 48h, P2 in 7 days.\n// Stage 1: stale and not yet reminded -> comment + label 'sla-reminder'\n// Stage 2: already reminded and still stale  -> comment ESCALATED + label 'sla-escalated'\nconst sla = { 'P1-CRITICAL': 48, 'P2-HIGH': 168 };\nconst issues = $input.all().map(i => i.json).filter(i => i.number);\nconst now = Date.now();\n\nconst actions = [];\nfor (const issue of issues) {\n  const m = issue.title.match(/\\[(P[12])-(CRITICAL|HIGH)\\]/);\n  if (!m) continue;\n  const prio = m[1] + '-' + m[2];\n  const limit = sla[prio];\n  if (!limit) continue;\n\n  const ageHours = (now - new Date(issue.created_at).getTime()) / 3600000;\n  if (ageHours < limit) continue;\n\n  const labels = (issue.labels ?? []).map(l => l.name);\n  const overdue = Math.floor(ageHours - limit);\n\n  if (!labels.includes('sla-reminder')) {\n    actions.push({ json: {\n      number: issue.number, action: 'remind',\n      body: 'SLA reminder: this ' + prio + ' ticket is ' + Math.floor(ageHours) + 'h old (SLA ' + limit + 'h). Please remediate or request verification.',\n      label: 'sla-reminder', color: 'fde047'\n    }});\n  } else if (!labels.includes('sla-escalated')) {\n    actions.push({ json: {\n      number: issue.number, action: 'escalate',\n      body: 'ESCALATED: SLA exceeded by ' + overdue + 'h without remediation or verification. Escalating to management.',\n      label: 'sla-escalated', color: 'dc2626'\n    }});\n  }\n}\nreturn actions;"
+      },
+      "id": "c2000000-0002-4000-8000-sla000003",
+      "name": "Classify SLA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.label, color: $json.color }) }}",
+        "options": {
+          "response": { "response": { "neverError": true } }
+        }
+      },
+      "id": "c2000000-0003-4000-8000-sla000004",
+      "name": "Ensure Label Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $json.number }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: [$json.label] }) }}",
+        "options": {}
+      },
+      "id": "c2000000-0004-4000-8000-sla000005",
+      "name": "Tag Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $json.number }}/comments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: $json.body }) }}",
+        "options": {}
+      },
+      "id": "c2000000-0005-4000-8000-sla000006",
+      "name": "Post Comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 0]
+    }
+  ],
+  "connections": {
+    "Daily 9am": {
+      "main": [[{ "node": "Get Open Tickets", "type": "main", "index": 0 }]]
+    },
+    "Manual SLA Check": {
+      "main": [[{ "node": "Get Open Tickets", "type": "main", "index": 0 }]]
+    },
+    "Get Open Tickets": {
+      "main": [[{ "node": "Classify SLA", "type": "main", "index": 0 }]]
+    },
+    "Classify SLA": {
+      "main": [[{ "node": "Ensure Label Exists", "type": "main", "index": 0 }]]
+    },
+    "Ensure Label Exists": {
+      "main": [[{ "node": "Tag Ticket", "type": "main", "index": 0 }]]
+    },
+    "Tag Ticket": {
+      "main": [[{ "node": "Post Comment", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": {
+    "description": "Daily SLA pass over open remediation tickets: P1 48h / P2 7d. First breach gets a reminder comment + label; a second pass escalates."
+  }
+}

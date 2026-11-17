@@ -179,7 +179,64 @@ function FindingDetail({ f, importance, ticket, onClose }: {
           ))}
         </div>
       </div>
+      <AcceptRiskForm cve={f.cve} />
     </div>
+  );
+}
+
+/* ---------- accepted-risk exception (dated + approved) ---------- */
+
+function AcceptRiskForm({ cve }: { cve: string }) {
+  const defaultUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const [open, setOpen] = useState(false);
+  const form = useForm({ cve, until: defaultUntil, reason: '' });
+
+  if (!open) {
+    return (
+      <div className="mt-2 border-t border-neutral-200 pt-2 dark:border-neutral-700">
+        <button
+          onClick={() => setOpen(true)}
+          className="rounded border border-neutral-300 px-2 py-1 text-[11px] font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >
+          Accept risk (exception)
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); form.post('/tickets/accept-risk', { preserveScroll: true, onSuccess: () => setOpen(false) }); }}
+      className="mt-2 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-2 dark:border-neutral-700"
+    >
+      <span className="text-[11px] font-semibold text-neutral-500">Accepted risk until</span>
+      <input
+        type="date"
+        value={form.data.until}
+        onChange={(e) => form.setData('until', e.target.value)}
+        className="rounded border border-neutral-300 bg-white px-2 py-1 text-[11px] dark:border-neutral-700 dark:bg-neutral-950"
+      />
+      <input
+        type="text"
+        placeholder="reason (approved by…)"
+        value={form.data.reason}
+        onChange={(e) => form.setData('reason', e.target.value)}
+        className="min-w-40 flex-1 rounded border border-neutral-300 bg-white px-2 py-1 text-[11px] dark:border-neutral-700 dark:bg-neutral-950"
+      />
+      <button
+        type="submit"
+        disabled={form.processing}
+        className="rounded bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-500 disabled:opacity-40"
+      >
+        Approve exception
+      </button>
+      <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-neutral-500 hover:underline">
+        cancel
+      </button>
+      {(form.errors as Record<string, string>).cve && (
+        <span className="text-[11px] text-red-600">{(form.errors as Record<string, string>).cve}</span>
+      )}
+    </form>
   );
 }
 
@@ -424,7 +481,7 @@ export default function VulnOverview({
   }, [scanStatus]);
 
   useEffect(() => {
-    if (scanStatus.state === 'running' && !polling) startPolling();
+    if ((scanStatus.state === 'running' || scanStatus.state === 'enriching') && !polling) startPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -461,7 +518,8 @@ export default function VulnOverview({
     });
   };
 
-  const running = polling && status.state === 'running';
+  const running = polling && (status.state === 'running' || status.state === 'enriching');
+  const enriching = status.state === 'enriching';
 
   const prioritySegments = [
     { label: 'P1 Critical', value: stats.p1, color: P_COLORS['P1-CRITICAL'] },
@@ -521,7 +579,11 @@ export default function VulnOverview({
           <div className="rounded-lg border bg-white p-4 dark:bg-neutral-950">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
               {running && <span className="size-2 animate-pulse rounded-full bg-emerald-500" />}
-              {running ? 'Scan in progress' : status.state === 'done' ? 'Last scan completed' : 'Last scan failed'}
+              {status.state === 'running'
+                ? 'Scan in progress'
+                : enriching
+                  ? 'n8n pipeline: enrichment + prioritization + ticketing'
+                  : status.state === 'done' ? 'Last scan completed' : 'Last scan failed'}
               {status.started_at && (
                 <span className="text-xs font-normal text-neutral-500">· {status.started_at}</span>
               )}

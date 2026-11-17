@@ -1,0 +1,356 @@
+{
+  "name": "Remediation Verification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "verify-request",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "d3000000-0000-4000-8000-verify0001",
+      "name": "Verification Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-300, 0],
+      "webhookId": "verify-request"
+    },
+    {
+      "parameters": {
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $json.body.ticket }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d3000000-0001-4000-8000-verify0002",
+      "name": "Get Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-60, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract CVE + asset name from the ticket title '[P1-...] Fix CVE-x on Asset'\nconst issue = $input.first().json;\nconst m = issue.title.match(/\\[(P\\d)-[A-Z]+\\] Fix (CVE-\\d{4}-\\d{4,}) on (.+)$/);\nif (!m) {\n  return [{ json: { error: 'Cannot parse ticket title: ' + issue.title, ticket: issue.number } }];\n}\nreturn [{ json: { ticket: issue.number, cve: m[2], asset_name: m[3].trim(), state: issue.state } }];"
+      },
+      "id": "d3000000-0002-4000-8000-verify0003",
+      "name": "Parse CVE + Asset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [180, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.cve }}",
+              "rightValue": "CVE-",
+              "operator": { "type": "string", "operation": "startsWith" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d3000000-0003-4000-8000-verify0004",
+      "name": "Parseable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [420, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/agent/scan/start",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Agent-Token", "value": "***REMOVED***" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ mode: 'raw' }) }}",
+        "options": {}
+      },
+      "id": "d3000000-0004-4000-8000-verify0005",
+      "name": "Launch Proof Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 45,
+        "unit": "seconds"
+      },
+      "id": "d3000000-0005-4000-8000-verify0006",
+      "name": "Wait 45s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [900, 0],
+      "webhookId": "verify-wait-1"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/api/agent/scan/status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Agent-Token", "value": "***REMOVED***" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d3000000-0006-4000-8000-verify0007",
+      "name": "Poll Scan Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1140, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.state === 'running' }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d3000000-0007-4000-8000-verify0008",
+      "name": "Still scanning?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1380, 0]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/api/agent/reports/raw",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Agent-Token", "value": "***REMOVED***" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d3000000-0008-4000-8000-verify0009",
+      "name": "Fetch Fresh Reports",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Is the CVE still present on the same asset in the fresh scan?\nconst ctx = $('Parse CVE + Asset').first().json;\nconst fresh = $input.all().map(i => i.json);\nconst stillThere = fresh.some(f => f.cve === ctx.cve && f.asset_name === ctx.asset_name);\nconst evidence = {\n  ticket: ctx.ticket,\n  cve: ctx.cve,\n  asset: ctx.asset_name,\n  scanned_at: new Date().toISOString(),\n  still_present: stillThere,\n  total_findings_in_scan: fresh.length\n};\nreturn [{ json: evidence }];"
+      },
+      "id": "d3000000-0009-4000-8000-verify0010",
+      "name": "Compare Evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.still_present }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d3000000-0010-4000-8000-verify0011",
+      "name": "Finding still present?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2120, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $json.ticket }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ state: 'closed' }) }}",
+        "options": {}
+      },
+      "id": "d3000000-0011-4000-8000-verify0012",
+      "name": "Close Ticket (verified)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2380, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $('Compare Evidence').first().json.ticket }}/comments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: 'Proof scan ' + $('Compare Evidence').first().json.scanned_at + ': CVE ' + $('Compare Evidence').first().json.cve + ' is NO LONGER present on ' + $('Compare Evidence').first().json.asset + ' (' + $('Compare Evidence').first().json.total_findings_in_scan + ' findings in fresh scan). Ticket closed with scan evidence.' }) }}",
+        "options": {}
+      },
+      "id": "d3000000-0012-4000-8000-verify0013",
+      "name": "Comment Close Evidence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2620, -100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $json.ticket }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ state: 'open' }) }}",
+        "options": {}
+      },
+      "id": "d3000000-0013-4000-8000-verify0014",
+      "name": "Reopen Ticket (not fixed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2380, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gitea:3000/api/v1/repos/vulnadmin/remediation-tickets/issues/{{ $('Compare Evidence').first().json.ticket }}/comments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "token 413771fee52623e9fd2c67a053b68c16d88ad638" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: 'Proof scan ' + $('Compare Evidence').first().json.scanned_at + ': CVE ' + $('Compare Evidence').first().json.cve + ' is STILL PRESENT on ' + $('Compare Evidence').first().json.asset + '. The remediation did not hold - ticket reopened.' }) }}",
+        "options": {}
+      },
+      "id": "d3000000-0014-4000-8000-verify0015",
+      "name": "Comment Reopen Evidence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2620, 160]
+    }
+  ],
+  "connections": {
+    "Verification Request": {
+      "main": [[{ "node": "Get Ticket", "type": "main", "index": 0 }]]
+    },
+    "Get Ticket": {
+      "main": [[{ "node": "Parse CVE + Asset", "type": "main", "index": 0 }]]
+    },
+    "Parse CVE + Asset": {
+      "main": [[{ "node": "Parseable?", "type": "main", "index": 0 }]]
+    },
+    "Parseable?": {
+      "main": [
+        [{ "node": "Launch Proof Scan", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Launch Proof Scan": {
+      "main": [[{ "node": "Wait 45s", "type": "main", "index": 0 }]]
+    },
+    "Wait 45s": {
+      "main": [[{ "node": "Poll Scan Status", "type": "main", "index": 0 }]]
+    },
+    "Poll Scan Status": {
+      "main": [[{ "node": "Still scanning?", "type": "main", "index": 0 }]]
+    },
+    "Still scanning?": {
+      "main": [
+        [{ "node": "Wait 45s", "type": "main", "index": 0 }],
+        [{ "node": "Fetch Fresh Reports", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Fresh Reports": {
+      "main": [[{ "node": "Compare Evidence", "type": "main", "index": 0 }]]
+    },
+    "Compare Evidence": {
+      "main": [[{ "node": "Finding still present?", "type": "main", "index": 0 }]]
+    },
+    "Finding still present?": {
+      "main": [
+        [{ "node": "Reopen Ticket (not fixed)", "type": "main", "index": 0 }],
+        [{ "node": "Close Ticket (verified)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Close Ticket (verified)": {
+      "main": [[{ "node": "Comment Close Evidence", "type": "main", "index": 0 }]]
+    },
+    "Reopen Ticket (not fixed)": {
+      "main": [[{ "node": "Comment Reopen Evidence", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": {
+    "description": "Phase 8: proof scan requested per ticket -> compare fresh Trivy reports -> close with evidence if the CVE is gone, reopen if it is still present."
+  }
+}
